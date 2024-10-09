@@ -1,0 +1,181 @@
+---
+title: "ABCDv5.1 Baseline Scores"
+output:
+  html_notebook:
+    toc: true
+    toc_float:
+      collapsed: false
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = "asis")
+library(tidyverse)
+library(RColorBrewer)
+library(kableExtra)
+library(glmnet)
+set.seed(2024)
+```
+
+```{r}
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() #1509
+
+## scale and centre numeric variables
+numcols = names(train)[lapply(train, is.numeric)==T]
+train = train |> mutate_at(numcols, ~ c(scale(.)) )
+test = test |> mutate_at(numcols, ~ c(scale(.)) )
+
+## remove columns that are not used for training data and make interactions
+x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress) |> data.matrix()
+
+x_interact = x[,-grep("gender", colnames(x))] * as.numeric(train$gender)
+colnames(x_interact) = paste0(colnames(x_interact), "_gender")
+
+## remove columns not used in test data and make interactions
+test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress) |> data.matrix()
+
+test_pred_interact = test_pred[,-grep("gender", colnames(test_pred))] * as.numeric(test$gender)
+colnames(test_pred_interact) = paste0(colnames(test_pred_interact), "_gender")
+
+## data for glm
+preds = cbind(x, x_interact)
+dep = train$cbcl_dsm5_depress
+int = train$cbcl_internalising
+
+testpreds = cbind(test_pred, test_pred_interact)
+rm(x, x_interact, test_pred, test_pred_interact, numcols)
+```
+
+## Elastic net linear regression using 'glmnet'
+
+80-20 training-test split. Training sample N=6079, test sample N=1509. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. 
+
+### CBCL DSM5-oriented depression subscale
+
+```{r}
+depfit = cv.glmnet(x = preds, y = dep, nfolds = 10)
+plot(depfit)
+print(depfit)
+depfit_coef = coef(depfit, s = "lambda.1se") |> as.matrix()
+depfit_min = coef(depfit, s = "lambda.min") |> as.matrix()
+
+coef_dep = data.frame(
+  preds = rownames(depfit_coef),
+  beta.min = depfit_min[,1],
+  beta.1se = depfit_coef[,1],
+  out = rep("CBCL_depression", nrow(depfit_coef)),
+  row.names = NULL
+)
+```
+
+### CBCL internalising subscale
+
+```{r}
+intfit = cv.glmnet(x = preds, y = int, nfolds = 10)
+plot(intfit)
+print(intfit)
+intfit_coef = coef(intfit, s = "lambda.1se") |> as.matrix()
+intfit_min = coef(intfit, s = "lambda.min") |> as.matrix()
+
+coef_int = data.frame(
+  preds = rownames(intfit_coef),
+  beta.min = intfit_min[,1],
+  beta.1se = intfit_coef[,1],
+  out = rep("CBCL_internalising", nrow(intfit_coef)),
+  row.names = NULL
+)
+```
+
+## Coefficients
+
+beta.min = coefficients for lambda value that produces minimum mean cross-validated error
+beta.1se = coefficients for lambda value that produces the most regularized model while keeping the cross-validated error within one standard error of the minimum.
+
+```{r}
+base_coefs = rbind(coef_int[-1,], coef_dep[-1,])
+
+data.frame(predictor = coef_int[,1],
+           dep_beta.min = coef_dep[,2],
+           dep_beta.1se = coef_dep[,3],
+           int_beta.min = coef_int[,2],
+           int_beta.1se = coef_int[,3]) |> 
+  kbl(digits=3) |> kableExtra::kable_styling()
+```
+### beta.min
+
+```{r fig.height=20, fig.width=10}
+ggplot(base_coefs, aes(x = out, y = preds, fill = beta.min)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+#ggsave(filename = "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/FIGS/baseline_coefs_all.svg",height = 400, width = 200, units = "mm")
+```
+
+### beta.1se
+
+```{r fig.height=20, fig.width=10}
+ggplot(base_coefs, aes(x = out, y = preds, fill = beta.1se)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.1se, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+```
+
+## Non-zero coefficients
+
+### beta.min
+
+```{r fig.width=10, fig.height=7}
+base_coefs_sig = base_coefs %>% filter(abs(round(beta.min, 3))>0)
+
+ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+
+#ggsave(filename = "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/FIGS/baseline_coefs_1.svg",height = 140, width = 200, units = "mm")
+```
+
+### beta.1se
+
+```{r fig.width=10, fig.height=7}
+base_coefs_sig = base_coefs %>% filter(abs(round(beta.1se, 3))>0)
+
+ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.1se, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+```
+
+## Descriptives: Training
+
+```{r results='asis'}
+train = readRDS("DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
+test = readRDS("DATA/baseline_testdat.rds") |> na.omit() #1509
+
+summarytools::dfSummary(train[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
+                        na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
+```
+
+## Descriptives: Test
+
+```{r}
+summarytools::dfSummary(test[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
+                        na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
+```
+

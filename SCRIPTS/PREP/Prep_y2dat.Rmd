@@ -1,0 +1,93 @@
+---
+title: "Y2 ABCD v5.1 prep"
+author: "Eileen Xu"
+date: "2024-09-17"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, results = "asis", warning = F)
+library(tidyverse)
+library(kableExtra)
+options(knitr.kable.NA = '')
+```
+
+```{r}
+dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
+y2 = dat %>% filter(eventname=="2_year_follow_up_y_arm_1") %>% select_if(~ !all(is.na(.))) |> droplevels()
+```
+
+Total N = `r nrow(y2)` \
+10% missing = `r nrow(y2)*0.1` \
+20% missing = `r nrow(y2)*0.2` \
+30% missing = `r nrow(y2)*0.3` \
+40% missing = `r nrow(y2)*0.4` \
+50% missing = `r nrow(y2)*0.5` 
+
+```{r}
+y2 |> select_if(~ is.numeric(.)) |> summary(.) |> kbl() |> kable_styling()
+```
+
+TLFB alcohol includes data for `r sum(!is.na(y2$tlfb_cal_scr_alc_ud))` individuals, TLFB cannabis includes data for `r sum(!is.na(y2$su_tlfb_cal_scr_mj_days_yr))`. Total use days has data for `r sum(!is.na(y2$tlfb_cal_scr_num_events))`. Perhaps we could keep total use days data (combines alcohol, cannabis etc) and fill with 0?
+
+```{r}
+y2 |> select_if(~ is.factor(.)) |> summary() |> kbl() |> kable_styling()
+```
+
+Nobody has tried illicit drugs, so this can be removed. 
+
+```{r}
+y2 = y2 |> mutate(
+  tlfb_cal_scr_num_events = replace_na(tlfb_cal_scr_num_events, 0)
+)
+
+y2 = y2 |> select_if(~ sum(is.na(.))<0.2*nrow(y2))
+y2= y2 |> select(-c(eventname, illicit, site_id_l, rel_birth_id, interview_date, visit_type, birthsex, gender_id))
+
+names(y2) = c("src_subject_id", "tlfb_use_days", "weightcontrol_ksads", "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", "p_abuse", "emot_abuse", "serious_accident", "bkfs_fruit", "bkfs_veg", "sleep_hrs", "bmi", "needed_food", "income", "parent_ed", "gender", "race_ethnicity", "comm_safety", "discrimination", "days_active", "bully_relational", "bully_reputational", "bully_overt", "chronotype", "life_events", "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
+
+y2 = droplevels(y2)
+
+# remove cbcl missing data
+y2 = y2 %>% filter(!is.na(cbcl_internalising))
+sapply(y2, function(x) sum(is.na(x))) |> kbl(col.names = c("", "N missing")) |> kable_styling()
+```
+
+Little's MCAR test for continuous variables:
+
+```{r}
+y2 |> select_if(~ is.numeric(.)) |> naniar::mcar_test() |> kbl() |> kable_styling()
+```
+
+```{r}
+mice::md.pattern(y2, plot = F, rotate.names=T) |> kbl(col.names = c("N with pattern", names(y2), "N missing in pattern")) |> kable_styling()
+```
+
+```{r}
+## split into train and test samples ##
+index = caret::createDataPartition(y2$cbcl_internalising[which(is.na(y2$cbcl_internalising)==F)], 
+                            p = 0.2, list = F, times = 1)
+traindat = y2[-index,]
+testdat = y2[index,]
+```
+
+Training data:
+
+```{r}
+traindat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = F, varnumbers = F)
+```
+
+Test data:
+
+```{r}
+testdat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = F, varnumbers = F)
+```
+
+
+```{r eval=FALSE}
+saveRDS(traindat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_traindat.rds")
+saveRDS(testdat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_testdat.rds")
+```
+

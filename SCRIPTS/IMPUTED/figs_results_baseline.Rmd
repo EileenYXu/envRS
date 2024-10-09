@@ -1,0 +1,98 @@
+---
+title: "ABCDv5.1 Baseline Scores"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = "asis")
+library(tidyverse)
+library(RColorBrewer)
+library(kableExtra)
+```
+
+```{r}
+dep_coefs = read.csv("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_dep_coefs.csv")
+names(dep_coefs) = c("Predictor", "Dep")
+int_coefs = read.csv("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_int_coefs.csv")
+names(int_coefs) = c("Predictor", "Int")
+
+base_coefs = merge(dep_coefs, int_coefs, by="Predictor")
+base_coefs = pivot_longer(base_coefs[-1,], cols = c("Dep", "Int"), names_to = "Outcome")
+```
+
+```{r}
+dep_fit = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_dep_fit.rds")
+int_fit = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_int_fit.rds")
+
+traindat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds")
+testdat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds")
+```
+
+## Predicting raw CBCL scores using Elastic net
+
+Total N=`r nrow(testdat) + nrow(traindat)`, 80-20 training-test split. Training sample N=`r nrow(traindat)`, test sample N=`r nrow(testdat)`. \
+Missing data imputed using mice; training and test data were imputed separately. Race_ethnicity was included in the imputation model, though this was removed before fitting the EN model. Each dataset was imputed 5 times. \
+\
+
+Elastic net regression was fit over the stacked multiply imputed data (miselect::cv.saenet) with 10-fold cross-validation. Weights by proportion of missing data in the original unimputed dataset. \
+Resulting coefficients were applied back to the training and test data to get predicted scores for each imputed dataset. Results of linear models were pooled to get a single estimate for effect size (unstandardised beta) and R2. \
+
+## Predicting CBCL DSM5-oriented Depression Subscale
+
+alpha = `r dep_fit$alpha.min` \
+lambda = `r dep_fit$lambda.min` \
+
+alpha 0=ridge, 1=lasso
+
+```{r}
+dep_stats = read.csv("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_dep_results.csv")
+
+kbl(dep_stats[,-1], digits = 3) %>% kable_styling()
+```
+
+## Predicting CBCL Internalising Subscale
+
+alpha = `r int_fit$alpha.min` \
+lambda = `r int_fit$lambda.min` \
+
+alpha 0=ridge, 1=lasso
+
+```{r}
+int_stats = read.csv("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/baseline_int_results.csv")
+
+kbl(int_stats[,-1], digits = 3) %>% kable_styling()
+```
+
+## All coefficients
+
+```{r fig.height=20, fig.width=10}
+ggplot(base_coefs, aes(x = Outcome, y = Predictor, fill = value)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(value, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Beta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+#ggsave(filename = "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/FIGS/baseline_coefs_all.svg",height = 400, width = 200, units = "mm")
+```
+
+## Coefficients \>0.1
+
+```{r fig.width=10, fig.height=7}
+base_coefs_0.1 = base_coefs %>% filter(abs(value)>=0.1)
+
+ggplot(base_coefs_0.1, aes(x = Outcome, y = Predictor, fill = value)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(value, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Beta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+
+#ggsave(filename = "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/FIGS/baseline_coefs_1.svg",height = 140, width = 200, units = "mm")
+```
+
