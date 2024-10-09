@@ -1,3 +1,0 @@
-Eddie
-$ screen -r [pid.tty.host]
-source /exports/applications/support/set_qlogin_environment.sh
