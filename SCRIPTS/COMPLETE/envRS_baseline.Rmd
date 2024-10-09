@@ -13,8 +13,8 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, results = "asis")
 library(tidyverse)
 library(RColorBrewer)
-library(kableExtra)
 library(glmnet)
+library(kableExtra)
 set.seed(2024)
 ```
 
@@ -48,16 +48,21 @@ testpreds = cbind(test_pred, test_pred_interact)
 rm(x, x_interact, test_pred, test_pred_interact, numcols)
 ```
 
-## Elastic net linear regression using 'glmnet'
+# Elastic net linear regression using 'glmnet'
 
 80-20 training-test split. Training sample N=6079, test sample N=1509. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. 
 
-### CBCL DSM5-oriented depression subscale
+## CBCL DSM5-oriented depression subscale
 
 ```{r}
 depfit = cv.glmnet(x = preds, y = dep, nfolds = 10)
 plot(depfit)
-print(depfit)
+```
+
+
+```{r results='hide'}
+dep.print = print(depfit)
+
 depfit_coef = coef(depfit, s = "lambda.1se") |> as.matrix()
 depfit_min = coef(depfit, s = "lambda.min") |> as.matrix()
 
@@ -70,12 +75,66 @@ coef_dep = data.frame(
 )
 ```
 
-### CBCL internalising subscale
+```{r}
+dep.print |> kbl(digits = 3) |> kable_styling()
+```
+
+### Fit statistics
+
+```{r}
+train_min = assess.glmnet(depfit, newx = preds, newy = dep, s = "lambda.min")
+train_1se = assess.glmnet(depfit, newx = preds, newy = dep, s = "lambda.1se")
+test_min = assess.glmnet(depfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+test_1se = assess.glmnet(depfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+
+data.frame(sample = c("training", "training", "test", "test"),
+           lambda = c("min", "1se", "min", "1se"),
+           mse = c(train_min$mse, train_1se$mse, test_min$mse, test_1se$mse),
+           mae = c(train_min$mae, train_1se$mae, test_min$mae, test_1se$mae)) |> 
+  kbl(digits = 3) |> kable_styling() |> scroll_box()
+```
+
+### Plot predictions
+
+```{r}
+depRS_train = data.frame(
+  cbcl_dep = dep,
+  depRS.min = predict(depfit, newx = preds, s = "lambda.min"),
+  depRS.1se = predict(depfit, newx = preds, s = "lambda.1se"),
+  data = rep("train", times= length(dep))
+)
+
+depRS_test = data.frame(
+  cbcl_dep = test$cbcl_dsm5_depress,
+  depRS.min = predict(depfit, newx = testpreds, s = "lambda.min"),
+  depRS.1se = predict(depfit, newx = testpreds, s = "lambda.1se"),
+  data = rep("test", times = nrow(test))
+)
+
+depRS_dat = rbind(depRS_test, depRS_train) |> 
+  pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
+```
+
+```{r}
+ggplot(depRS_dat, aes(y = cbcl_dep, x = predicted, colour = lambda)) +
+  geom_smooth() +
+  theme_bw() +
+  facet_wrap(~data) +
+  labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
+```
+
+
+## CBCL internalising subscale
 
 ```{r}
 intfit = cv.glmnet(x = preds, y = int, nfolds = 10)
 plot(intfit)
-print(intfit)
+```
+
+
+```{r results='hide'}
+int.print = print(intfit)
+
 intfit_coef = coef(intfit, s = "lambda.1se") |> as.matrix()
 intfit_min = coef(intfit, s = "lambda.min") |> as.matrix()
 
@@ -86,6 +145,54 @@ coef_int = data.frame(
   out = rep("CBCL_internalising", nrow(intfit_coef)),
   row.names = NULL
 )
+```
+
+```{r}
+int.print |> kbl(digits = 3) |> kable_styling()
+```
+
+### Fit statistics
+
+```{r}
+train_min = assess.glmnet(intfit, newx = preds, newy = int, s = "lambda.min")
+train_1se = assess.glmnet(intfit, newx = preds, newy = int, s = "lambda.1se")
+test_min = assess.glmnet(intfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+test_1se = assess.glmnet(intfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s="lambda.min")
+
+data.frame(sample = c("training", "training", "test", "test"),
+           lambda = c("min", "1se", "min", "1se"),
+           mse = c(train_min$mse, train_1se$mse, test_min$mse, test_1se$mse),
+           mae = c(train_min$mae, train_1se$mae, test_min$mae, test_1se$mae)) |> 
+  kbl(digits = 3) |> kable_styling() |> scroll_box()
+```
+
+### Plot predictions
+
+```{r}
+intRS_train = data.frame(
+  cbcl_int = int,
+  intRS.min = predict(intfit, newx = preds, s = "lambda.min"),
+  intRS.1se = predict(intfit, newx = preds, s = "lambda.1se"),
+  data = rep("train", times= length(int))
+)
+
+intRS_test = data.frame(
+  cbcl_int = test$cbcl_internalising,
+  intRS.min = predict(intfit, newx = testpreds, s = "lambda.min"),
+  intRS.1se = predict(intfit, newx = testpreds, s = "lambda.1se"),
+  data = rep("test", times = nrow(test))
+)
+
+intRS_dat = rbind(intRS_test, intRS_train) |> 
+  pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
+```
+
+```{r}
+ggplot(intRS_dat, aes(y = cbcl_int, x = predicted, colour = lambda)) +
+  geom_smooth() +
+  theme_bw() +
+  facet_wrap(~data) +
+  labs(x = "predicted intRS", y = "CBCL internalising (scaled and centred)")
 ```
 
 ## Coefficients
@@ -101,8 +208,9 @@ data.frame(predictor = coef_int[,1],
            dep_beta.1se = coef_dep[,3],
            int_beta.min = coef_int[,2],
            int_beta.1se = coef_int[,3]) |> 
-  kbl(digits=3) |> kableExtra::kable_styling()
+  kbl(digits=3) |> kable_styling() |> scroll_box()
 ```
+
 ### beta.min
 
 ```{r fig.height=20, fig.width=10}
@@ -136,6 +244,8 @@ ggplot(base_coefs, aes(x = out, y = preds, fill = beta.1se)) +
 ```{r fig.width=10, fig.height=7}
 base_coefs_sig = base_coefs %>% filter(abs(round(beta.min, 3))>0)
 
+base_coefs_sig |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box()
+
 ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
   geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
@@ -153,6 +263,8 @@ ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
 ```{r fig.width=10, fig.height=7}
 base_coefs_sig = base_coefs %>% filter(abs(round(beta.1se, 3))>0)
 
+base_coefs_sig |> arrange(desc(beta.1se)) |> kbl() |> kable_styling() |> scroll_box()
+
 ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
   geom_text(aes(label = round(beta.1se, 3)), color = "black", size = 12, size.unit = "pt") +
@@ -165,8 +277,8 @@ ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
 ## Descriptives: Training
 
 ```{r results='asis'}
-train = readRDS("DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
-test = readRDS("DATA/baseline_testdat.rds") |> na.omit() #1509
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() #1509
 
 summarytools::dfSummary(train[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
                         na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
