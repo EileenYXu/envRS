@@ -12,7 +12,10 @@ knitr::opts_chunk$set(echo = F, message = F, results = "asis", warning = F)
 library(tidyverse)
 library(kableExtra)
 options(knitr.kable.NA = '')
+library(summarytools)
 ```
+
+## Preparing year 2 ABCD data for elastic net models
 
 ```{r}
 dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
@@ -44,25 +47,21 @@ y2 = y2 |> mutate(
 )
 
 y2 = y2 |> select_if(~ sum(is.na(.))<0.2*nrow(y2))
-y2= y2 |> select(-c(eventname, illicit, site_id_l, rel_birth_id, interview_date, visit_type, birthsex, gender_id))
+y2= y2 |> select(-c(eventname, illicit, site_id_l, rel_birth_id, interview_date, visit_type, gender_id))
 
-names(y2) = c("src_subject_id", "tlfb_use_days", "weightcontrol_ksads", "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", "p_abuse", "emot_abuse", "serious_accident", "bkfs_fruit", "bkfs_veg", "sleep_hrs", "bmi", "needed_food", "income", "parent_ed", "gender", "race_ethnicity", "comm_safety", "discrimination", "days_active", "bully_relational", "bully_reputational", "bully_overt", "chronotype", "life_events", "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
+names(y2) = c("src_subject_id", "tlfb_use_days", "weightcontrol_ksads", "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", "p_abuse", "emot_abuse", "serious_accident", "bkfs_fruit", "bkfs_veg", "sleep_hrs", "bmi", "needed_food", "income", "parent_ed", "birthsex", "gender", "race_ethnicity", "comm_safety", "discrimination", "days_active", "bully_relational", "bully_reputational", "bully_overt", "chronotype", "life_events", "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
 
 y2 = droplevels(y2)
 
 # remove cbcl missing data
 y2 = y2 %>% filter(!is.na(cbcl_internalising))
-sapply(y2, function(x) sum(is.na(x))) |> kbl(col.names = c("", "N missing")) |> kable_styling()
+sapply(y2, function(x) sum(is.na(x))) |> kbl(col.names = c("", "N missing")) |> kable_styling() |> scroll_box()
 ```
 
 Little's MCAR test for continuous variables:
 
 ```{r}
 y2 |> select_if(~ is.numeric(.)) |> naniar::mcar_test() |> kbl() |> kable_styling()
-```
-
-```{r}
-mice::md.pattern(y2, plot = F, rotate.names=T) |> kbl(col.names = c("N with pattern", names(y2), "N missing in pattern")) |> kable_styling()
 ```
 
 ```{r}
@@ -73,16 +72,25 @@ traindat = y2[-index,]
 testdat = y2[index,]
 ```
 
-Training data:
+## Descriptive statistics
+
+### Full sample
 
 ```{r}
-traindat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = F, varnumbers = F)
+y2[,-1] |>  dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
-Test data:
+
+### Training data:
 
 ```{r}
-testdat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = F, varnumbers = F)
+traindat[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### Test data:
+
+```{r}
+testdat[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 

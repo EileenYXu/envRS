@@ -291,20 +291,66 @@ ggplot(y2_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
 ```
 
-## Descriptives: Training
+## Plots
 
-```{r results='asis'}
+## Correlations between predictors: whole sample
+
+
+```{r fig.width=10, fig.height=10}
 train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_traindat.rds") |> na.omit() #4611 individuals
 test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_testdat.rds") |> na.omit() #1166
+
+dat = rbind(train, test) |> select(-src_subject_id, -race_ethnicity) |> data.matrix()
+
+cor(dat) |> 
+
+corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+## Correlations between predictors: training
+
+```{r fig.width=10, fig.height=10}
+dat = train |> select(-src_subject_id, -race_ethnicity) |> data.matrix()
+
+cor(dat) |> corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+## Correlations between predictors: test
+
+```{r fig.height=10, fig.width=10}
+dat = test |> select(-src_subject_id, -race_ethnicity) |> data.matrix()
+
+cor(dat) |> corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+## Descriptives: whole sample
+
+```{r results = 'asis'}
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_traindat.rds") |> na.omit() #4611 individuals
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_testdat.rds") |> na.omit() #1166
+
+rbind(train[,-1], test[,-1]) |> summarytools::dfSummary(round.digits = 3, valid.col = F, varnumbers = F, 
+                        na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
+```
+
+
+
+## Descriptives: training
+
+```{r results='asis'}
 
 summarytools::dfSummary(train[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
                         na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
 ```
 
-## Descriptives: Test
+## Descriptives: test
 
 ```{r}
 summarytools::dfSummary(test[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
                         na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
 ```
+
 

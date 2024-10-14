@@ -18,23 +18,32 @@ library(kableExtra)
 set.seed(2024)
 ```
 
+# Elastic net linear regression using 'glmnet'
+
+Predictors identified from quantitative reviews of adolescent MDD risk factors in baseline ABCD data are included in the model, along with interactions with gender (parent-reported child gender identity). I will also fit a model with interactions with birth sex too as a sensitivity analysis. 
+
+
 ```{r}
-train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
-test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() #1509
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() 
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() 
 
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
 test = test |> mutate_at(numcols, ~ c(scale(.)) )
 
+## exclude individuals identifying as GNC (too few for meaningful effect from interaction I think)
+train = train |> filter(gender != "GNC")
+test = test |> filter(gender != "GNC")
+
 ## remove columns that are not used for training data and make interactions
-x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress) |> data.matrix()
+x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
 
 x_interact = x[,-grep("gender", colnames(x))] * as.numeric(train$gender)
 colnames(x_interact) = paste0(colnames(x_interact), "_gender")
 
 ## remove columns not used in test data and make interactions
-test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress) |> data.matrix()
+test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
 
 test_pred_interact = test_pred[,-grep("gender", colnames(test_pred))] * as.numeric(test$gender)
 colnames(test_pred_interact) = paste0(colnames(test_pred_interact), "_gender")
@@ -48,21 +57,16 @@ testpreds = cbind(test_pred, test_pred_interact)
 rm(x, x_interact, test_pred, test_pred_interact, numcols)
 ```
 
-# Elastic net linear regression using 'glmnet'
-
-80-20 training-test split. Training sample N=6079, test sample N=1509. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. 
+80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet.
 
 ## CBCL DSM5-oriented depression subscale
 
 ```{r}
-depfit = cv.glmnet(x = preds, y = dep, nfolds = 10)
+depfit = cv.glmnet(x = preds, y = dep, nfolds = 10, type.measure = "deviance")
 plot(depfit)
 ```
 
-
 ```{r results='hide'}
-dep.print = print(depfit)
-
 depfit_coef = coef(depfit, s = "lambda.1se") |> as.matrix()
 depfit_min = coef(depfit, s = "lambda.min") |> as.matrix()
 
@@ -76,7 +80,20 @@ coef_dep = data.frame(
 ```
 
 ```{r}
-dep.print |> kbl(digits = 3) |> kable_styling()
+data.frame(Criteria = c("min", "1se"),
+           Lambda = c(depfit$lambda.min, depfit$lambda.1se),
+           
+           MSE = c(depfit$cvm[which(depfit$lambda == depfit$lambda.min)],
+                   depfit$cvm[which(depfit$lambda == depfit$lambda.1se)]),
+           
+           SE = c(depfit$cvsd[which(depfit$lambda == depfit$lambda.min)],
+                  depfit$cvsd[which(depfit$lambda == depfit$lambda.1se)]),
+           
+           RMSE = c(sqrt(depfit$cvm[which(depfit$lambda == depfit$lambda.min)]),
+                    sqrt(depfit$cvm[which(depfit$lambda == depfit$lambda.1se)])),
+           
+           Nonzero = c(sum(coef_dep$beta.min != 0), sum(coef_dep$beta.1se != 0 ))) |>
+  kbl(digits = 3) |> kable_styling()
 ```
 
 ### Fit statistics
@@ -120,9 +137,10 @@ ggplot(depRS_dat, aes(y = cbcl_dep, x = predicted, colour = lambda)) +
   geom_smooth() +
   theme_bw() +
   facet_wrap(~data) +
-  labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
+  labs(x = "predicted depRS", y = "CBCL depression /n (scaled and centred)")
 ```
 
+###
 
 ## CBCL internalising subscale
 
@@ -133,7 +151,6 @@ plot(intfit)
 
 
 ```{r results='hide'}
-int.print = print(intfit)
 
 intfit_coef = coef(intfit, s = "lambda.1se") |> as.matrix()
 intfit_min = coef(intfit, s = "lambda.min") |> as.matrix()
@@ -192,7 +209,7 @@ ggplot(intRS_dat, aes(y = cbcl_int, x = predicted, colour = lambda)) +
   geom_smooth() +
   theme_bw() +
   facet_wrap(~data) +
-  labs(x = "predicted intRS", y = "CBCL internalising (scaled and centred)")
+  labs(x = "predicted intRS", y = "CBCL internalising \n (scaled and centred)")
 ```
 
 ## Coefficients
@@ -217,7 +234,7 @@ data.frame(predictor = coef_int[,1],
 ggplot(base_coefs, aes(x = out, y = preds, fill = beta.min)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
   geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
-  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  scale_fill_gradient2(name = "Standardised \n Beta", low = "#2166AC", high = "#B2182B") +
   xlab(NULL) + ylab(NULL) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
@@ -231,7 +248,7 @@ ggplot(base_coefs, aes(x = out, y = preds, fill = beta.min)) +
 ggplot(base_coefs, aes(x = out, y = preds, fill = beta.1se)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
   geom_text(aes(label = round(beta.1se, 3)), color = "black", size = 12, size.unit = "pt") +
-  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  scale_fill_gradient2(name = "Standardised \n Beta, low = "#2166AC", high = "#B2182B") +
   xlab(NULL) + ylab(NULL) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
@@ -249,7 +266,7 @@ base_coefs_sig |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_
 ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
   geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
-  scale_fill_gradient2(name = "Standardised\nBeta", low = "#2166AC", high = "#B2182B") +
+  scale_fill_gradient2(name = "StandardisenBeta", low = "#2166AC", high = "#B2182B") +
   xlab(NULL) + ylab(NULL) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
@@ -280,14 +297,13 @@ ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
 train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() #6079 individuals
 test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() #1509
 
-summarytools::dfSummary(train[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
-                        na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
+summarytools::dfSummary(train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Descriptives: Test
 
 ```{r}
-summarytools::dfSummary(test[,-1], round.digits = 3, valid.col = F, varnumbers = F, 
-                        na.col = F, graph.col = F, labels.col = F, plain.ascii = F)
+summarytools::dfSummary(test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
+
 
