@@ -1,0 +1,387 @@
+---
+title: "envRS and PRS"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+editor_options:
+  chunk_output_type: inline
+---
+
+# Combining envRS with PRS
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, results = "asis")
+library(tidyverse)
+library(lme4)
+library(kableExtra)
+library(lmerTest)
+library(emmeans)
+emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
+```
+
+```{r}
+bpm = read.csv("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_dep_long_gen_only.csv")
+mddPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_mddipsych_prs_0831.t2.5.best", header = T)
+colnames(mddPRS)[4] = "mddPRS"
+cfPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/bpm_cf_prs_0817.t3.best", header = T)
+colnames(cfPRS)[4] = "cfPRS"
+hfPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/bpm_high_prs_0817.t2.best", header = T)
+colnames(hfPRS)[4] = "hfPRS"
+
+PRS = list(mddPRS, cfPRS, hfPRS) |> reduce(full_join, by="IID") |> 
+  select(IID, mddPRS, cfPRS, hfPRS)
+```
+
+```{r}
+envRS_b = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
+names(envRS_b) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
+envRS_b = envRS_b |> select(src_subject_id, cbcl_dep_b, cbcl_int_b, depRS_b, intRS_b)
+
+envRS_y2 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_y2.rds")
+names(envRS_y2) = c("src_subject_id", "cbcl_dep_y2", "depRS_y2", "depRS_1se", "data", "cbcl_int_y2", "intRS_y2", "intRS_1se", "data.y")
+envRS_y2 = envRS_y2 |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2, intRS_y2)
+
+envRS = merge(envRS_b, envRS_y2, by="src_subject_id", all.x=T)
+scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
+
+dat_long = merge(scores, bpm)
+```
+
+# Cross-sectional models at baseline CBCL
+
+Compare depRS only with adding PRS - does it explain more variance? How do the 3 different PRS compare? It looks like the hierarchical one does best. 
+
+```{r}
+m1 = lm(cbcl_dep_b ~ depRS_b, data=scores)
+summary(m1)
+m2 = lm(cbcl_dep_b ~ depRS_b + mddPRS, data=scores)
+summary(m2)
+m3 = lm(cbcl_dep_b ~ depRS_b + cfPRS, data=scores)
+summary(m3)
+m4 = lm(cbcl_dep_b ~ depRS_b + hfPRS, data=scores)
+summary(m4)
+
+performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
+```
+
+```{r}
+m1 = lm(cbcl_dep_b ~ intRS_b, data=scores)
+summary(m1)
+m2 = lm(cbcl_dep_b ~ intRS_b + mddPRS, data=scores)
+summary(m2)
+m3 = lm(cbcl_dep_b ~ intRS_b + cfPRS, data=scores)
+summary(m3)
+m4 = lm(cbcl_dep_b ~ intRS_b + hfPRS, data=scores)
+summary(m4)
+
+performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
+```
+
+## intRS and CBCL internalising
+
+Predicting internalising is (expectedly) somewhat poor
+
+```{r}
+m1 = lm(cbcl_int_b ~ intRS_b, data=scores)
+summary(m1)
+m2 = lm(cbcl_int_b ~ intRS_b + mddPRS, data=scores)
+summary(m2)
+m3 = lm(cbcl_int_b ~ intRS_b + cfPRS, data=scores)
+summary(m3)
+m4 = lm(cbcl_int_b ~ intRS_b + hfPRS, data=scores)
+summary(m4)
+
+performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
+```
+
+
+
+# Longitudinal BPM models?
+
+## BPM age-only model
+
+```{r}
+m0 = lmer(bpm_sum ~ interview_age + I(interview_age^2) + (1|src_subject_id), data = dat_long)
+```
+
+```{r}
+#---------- make df of original data ----------
+df.plot = dat_long %>%
+  group_by(across(eventname)) %>%
+  summarise(Age = mean(interview_age, na.rm = T),
+            Phenotype = mean(bpm_sum, na.rm = T),
+            SD = sd(bpm_sum, na.rm = T),
+            n = sum(!is.na(bpm_sum))) %>%
+  mutate(upper = Phenotype + ( qnorm(0.975)*SD/sqrt(n) ),
+         lower = Phenotype - ( qnorm(0.975)*SD/sqrt(n) ))
+
+#---------- plot ---------------
+age_vals = seq(min(dat_long$interview_age), max(dat_long$interview_age), 0.5)
+
+emm = emmeans(m0, specs = ~ interview_age + I(interview_age^2), 
+              at = list(interview_age = age_vals))
+pred = as.data.frame(summary(emm)) %>% cbind(., age_vals)
+emmeans.plot = ggplot() + 
+  geom_line(data = pred,
+            aes(x = age_vals, y = emmean),
+            linewidth = 1.5, na.rm = T, colour = "#0072B2") + 
+  geom_ribbon(data = pred,
+              aes(x = age_vals, y = emmean,
+                  ymin = lower.CL, ymax = upper.CL),
+              alpha = 0.2, na.rm = T, fill = "#0072B2") +
+  geom_point(data = df.plot, aes(x=Age, y=Phenotype))+
+  geom_line(data = df.plot, aes(x=Age, y=Phenotype)) +
+  geom_errorbar(data = df.plot, aes(x=Age, ymin = lower, ymax = upper))
+emmeans.plot
+```
+
+# Baseline depRS and PRS
+
+Some model comparisons between envRS ~ BPM trajectory and adding in PRS. Sample with both envRS and PRS is smaller: N = `r nrow(scores)` \n
+
+Models: \n
+m0 = bpm ~ age (same for all models) \n
+m1 = bpm ~ age + depRS \n
+m2 = bpm ~ age + depRS + PRS \n
+m3 = bpm ~ age + depRS*PRS \n
+
+all fit with random intercept for ID - including random slope of age doesn't converge. \n
+
+model comparisons fit with ML 
+
+## depRS + mddPRS {.tabset}
+
+### model comparison
+
+```{r}
+m0 = lmer(bpm_sum ~ interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+mddm1 = lmer(bpm_sum ~ depRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+mddm2 = lmer(bpm_sum ~ depRS_b + scale(mddPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+mddm3 = lmer(bpm_sum ~ depRS_b*scale(mddPRS) + interview_age + I(interview_age^2)  + (1|src_subject_id), data=dat_long)
+
+anova(mddm0, mddm1, mddm2, mddm3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m0
+
+```{r}
+r0 = sjPlot::tab_model(m0, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r0`
+
+### m1
+
+```{r}
+mddr1 = sjPlot::tab_model(mddm1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r mddr1`
+
+### m2
+
+```{r}
+mddr2 = sjPlot::tab_model(mddm2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r mddr2`
+
+### m3
+
+```{r}
+mddr3 = sjPlot::tab_model(mddm3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r mddr3`
+
+## depRS + cfPRS {.tabset}
+
+### model comparisons
+
+```{r}
+m0 = lmer(bpm_sum ~ interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+cfm1 = lmer(bpm_sum ~ depRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+cfm2 = lmer(bpm_sum ~ depRS_b + scale(cfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+cfm3 = lmer(bpm_sum ~ depRS_b*scale(cfPRS) + interview_age + I(interview_age^2)  + (1|src_subject_id), data=dat_long)
+
+anova(m0, cfm1, cfm2, cfm3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m1
+
+```{r}
+cfr1 = sjPlot::tab_model(cfm1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r cfr1`
+
+### m2
+
+```{r}
+cfr2 = sjPlot::tab_model(cfm2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r cfr2`
+
+### m3
+
+```{r}
+cfr3 = sjPlot::tab_model(cfm3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r cfr3`
+
+## depRS + hfPRS {.tabset}
+
+### model comparisons
+
+```{r}
+m0 = lmer(bpm_sum ~ interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+hfm1 = lmer(bpm_sum ~ depRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+hfm2 = lmer(bpm_sum ~ depRS_b + scale(hfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+hfm3 = lmer(bpm_sum ~ depRS_b*scale(hfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+
+anova(m0, hfm1, hfm2, hfm3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m1
+
+```{r}
+hfr1 = sjPlot::tab_model(hfm1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r hfr1`
+
+### m2
+
+```{r}
+hfr2 = sjPlot::tab_model(hfm2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r hfr2`
+
+### m3
+
+```{r}
+hfr3 = sjPlot::tab_model(hfm3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r hfr3`
+
+## intRS + mddPRS {.tabset}
+
+### model comparison
+
+```{r}
+intm0 = lmer(bpm_sum ~ interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+intm1 = lmer(bpm_sum ~ intRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+intm2 = lmer(bpm_sum ~ intRS_b + scale(mddPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+intm3 = lmer(bpm_sum ~ intRS_b*scale(mddPRS) + interview_age + I(interview_age^2)  + (1|src_subject_id), data=dat_long)
+
+anova(intm0, intm1, intm2, intm3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m1
+
+```{r}
+r1 = sjPlot::tab_model(intm1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r1`
+
+### m2
+
+```{r}
+r2 = sjPlot::tab_model(intm2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r2`
+
+### m3
+
+```{r}
+r3 = sjPlot::tab_model(intm3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r3`
+
+## intRS + cfPRS {.tabset}
+
+### model comparisons
+
+```{r}
+m1 = lmer(bpm_sum ~ intRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+m2 = lmer(bpm_sum ~ intRS_b + scale(cfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+m3 = lmer(bpm_sum ~ intRS_b*scale(cfPRS) + interview_age + I(interview_age^2)  + (1|src_subject_id), data=dat_long)
+
+anova(m0, m1, m2, m3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m1
+
+```{r}
+r1 = sjPlot::tab_model(m1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r1`
+
+### m2
+
+```{r}
+r2 = sjPlot::tab_model(m2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r2`
+
+### m3
+
+```{r}
+r3 = sjPlot::tab_model(m3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r3`
+
+## intRS + hfPRS {.tabset}
+
+### model comparisons
+
+```{r}
+m0 = lmer(bpm_sum ~ interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+m1 = lmer(bpm_sum ~ intRS_b + interview_age + I(interview_age^2)  + (1|src_subject_id), data = dat_long)
+m2 = lmer(bpm_sum ~ intRS_b + scale(hfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+m3 = lmer(bpm_sum ~ intRS_b*scale(hfPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
+
+anova(m0, m1, m2, m3) %>% as.data.frame() %>% 
+  kbl() %>% kable_styling(full_width = F)
+```
+
+### m1
+
+```{r}
+r1 = sjPlot::tab_model(m1, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r1`
+
+### m2
+
+```{r}
+r2 = sjPlot::tab_model(m2, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r2`
+
+### m3
+
+```{r}
+r3 = sjPlot::tab_model(m3, show.stat = T, show.r2 = T)$knitr
+```
+
+`r r3`

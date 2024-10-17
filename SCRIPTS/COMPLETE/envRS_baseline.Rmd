@@ -27,6 +27,9 @@ Predictors identified from quantitative reviews of adolescent MDD risk factors i
 train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
 test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
 
+trainIDs = train$src_subject_id
+testIDs = test$src_subject_id
+
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
@@ -113,6 +116,7 @@ data.frame(Sample = c("training", "training", "test", "test"),
 
 ```{r}
 depRS_train = data.frame(
+  src_subject_id = trainIDs,
   cbcl_dep = dep,
   depRS.min = predict(depfit, newx = preds, s = "lambda.min"),
   depRS.1se = predict(depfit, newx = preds, s = "lambda.1se"),
@@ -120,11 +124,14 @@ depRS_train = data.frame(
 )
 
 depRS_test = data.frame(
+  src_subject_id = testIDs,
   cbcl_dep = test$cbcl_dsm5_depress,
   depRS.min = predict(depfit, newx = testpreds, s = "lambda.min"),
   depRS.1se = predict(depfit, newx = testpreds, s = "lambda.1se"),
   data = rep("test", times = nrow(test))
 )
+
+depRS = rbind(depRS_train, depRS_test)
 
 depRS_dat = rbind(depRS_test, depRS_train) |> 
   pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
@@ -196,6 +203,7 @@ data.frame(Sample = c("training", "training", "test", "test"),
 
 ```{r}
 intRS_train = data.frame(
+  src_subject_id = trainIDs,
   cbcl_int = int,
   intRS.min = predict(intfit, newx = preds, s = "lambda.min"),
   intRS.1se = predict(intfit, newx = preds, s = "lambda.1se"),
@@ -203,11 +211,17 @@ intRS_train = data.frame(
 )
 
 intRS_test = data.frame(
+  src_subject_id = testIDs,
   cbcl_int = test$cbcl_internalising,
   intRS.min = predict(intfit, newx = testpreds, s = "lambda.min"),
   intRS.1se = predict(intfit, newx = testpreds, s = "lambda.1se"),
   data = rep("test", times = nrow(test))
 )
+
+intRS = rbind(intRS_train, intRS_test)
+envRS = merge(depRS, intRS, by = "src_subject_id")
+
+#saveRDS(envRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
 
 intRS_dat = rbind(intRS_test, intRS_train) |> 
   pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
