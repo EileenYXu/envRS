@@ -74,14 +74,14 @@ ksads[,3:ncol(ksads)] = lapply(ksads[,3:ncol(ksads)], as.factor)
 summary(ksads)
 rm(diet, ptsd)
 
-#### neglect scale ####
+#### neglect scale - not available at baseline or y2 ####
 
-neglect = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_mnbs.csv")
-neglect = neglect %>% select(src_subject_id, eventname, mnbs_ss_mean_all)
+#neglect = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_mnbs.csv")
+#neglect = neglect %>% select(src_subject_id, eventname, mnbs_ss_mean_all)
 
-#### bkfs fruit/veg sum score ####
+#### bkfs ####
 bkfs = read.csv("G://data/abcd/release5.1/core/physical-health/ph_p_bkfs.csv")
-bkfs = bkfs %>% select(src_subject_id, eventname, bkfs_fruit_ce, bkfs_vegnopot_ce)
+bkfs = bkfs %>% select(src_subject_id, eventname, bkfs_fruit_ce, bkfs_vegnopot_ce, bkfs_dt_fibe)
 
 #### erq coping #####
 erq = read.csv("G://data/abcd/release5.1/core/mental-health/mh_y_erq.csv")
@@ -126,7 +126,7 @@ demog = demog %>% mutate(across(where(is.numeric), ~na_if(.,777)),
                          
                          parent_ed = coalesce(demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l,
                                               demo_prnt_ed_v2_l)|> 
-                           factor(levels = c(1:23), labels = c(rep("<HS", 12), "HS/GED", 
+                           factor(levels = c(1:23), labels = c(rep("less_HS", 12), "HS/GED", 
                                                                "HS/GED", rep("Some_College", 5), "Bachelor", 
                                                                rep("Postgrad", 3)), ordered = T),
                          
@@ -183,25 +183,60 @@ summary(screentime)
 
 #### bullying #####
 bully = read.csv("G://data/abcd/release5.1/core/mental-health/mh_y_peq.csv")
-bully = bully %>% select(src_subject_id, eventname, peq_ss_relational_victim, peq_ss_reputation_victim, peq_ss_overt_victim)
+bully = bully |> mutate(
+  bullying_victim = peq_ss_relational_victim + peq_ss_reputation_victim + peq_ss_overt_victim)
+
+bully = bully |> select(src_subject_id, eventname, bullying_victim)
+
 summary(bully)
+
+#### cyberbullying ####
+cyber = read.csv("G://data/abcd/release5.1/core/mental-health/mh_y_cbb.csv")
+cyber = cyber |> select(src_subject_id, eventname, cybb_phenx_harm)
+cyber$cybb_phenx_harm = na_if(cyber$cybb_phenx_harm, 777)
+cyber$cybb_phenx_harm = as.factor(cyber$cybb_phenx_harm)
+summary(cyber)
 
 #### chronotype ####
 chron = read.csv("G://data/abcd/release5.1/core/physical-health/ph_y_mctq.csv")
 chron = chron %>% select(src_subject_id, eventname, mctq_msfsc_calc)
 summary(chron)
 
-#### early life uncertainty ##########
+#### early life uncertainty ####
 ple = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_le.csv")
 ple = ple %>% select(src_subject_id, eventname, ple_p_ss_total_number)
 summary(ple)
 
+#### family conflict ####
+conflict = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_fes.csv")
+conflict = conflict |> select(src_subject_id, eventname, fes_y_ss_fc_pr)
+
+summary(conflict)
+
+#### parental monitoring ####
+monitor = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_pm.csv")
+monitor = monitor |> select(src_subject_id, eventname, pmq_y_ss_mean)
+
+summary(monitor)
+
+#### effortful control ####
+eff_control = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_eatq.csv")
+eff_control = eff_control |> select(src_subject_id, eventname, eatq_p_ss_effort_cont_ss)
+
+summary(eff_control)
+
+#### parent depression ####
+asr = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_asr.csv")
+asr = asr |> select(src_subject_id, eventname, asr_scr_depress_r)
+
+summary(asr)
+
 #### construct full dataset ####
-dfs = list(subs_use, ksads, neglect, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, chron, ple)
+dfs = list(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, eff_control, asr)
 
 dat = purrr::reduce(.x=dfs, merge, by = c("src_subject_id", "eventname"), all = T)
 
-rm(subs_use, ksads, neglect, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, chron, ple, dfs)
+rm(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, eff_control, asr)
 
 #### add family ID ####
 rel_id = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_y_lt.csv")
