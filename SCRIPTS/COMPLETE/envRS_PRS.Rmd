@@ -21,20 +21,20 @@ library(emmeans)
 emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
 ```
 
-```{r}
-bpm = read.csv("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_dep_long_gen_only.csv")
-mddPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_mddipsych_prs_0831.t2.5.best", header = T)
-colnames(mddPRS)[4] = "mddPRS"
-cfPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/bpm_cf_prs_0817.t3.best", header = T)
-colnames(cfPRS)[4] = "cfPRS"
-hfPRS = read.table("G://users/eileen/ABCD/PRS_ABCD_Eileen/bpm_high_prs_0817.t2.best", header = T)
-colnames(hfPRS)[4] = "hfPRS"
+```{r phenos}
+ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrelatedIDs.rds")
 
-PRS = list(mddPRS, cfPRS, hfPRS) |> reduce(full_join, by="IID") |> 
-  select(IID, mddPRS, cfPRS, hfPRS)
+bpm = read.csv("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_dep_long_gen_only.csv")
+
+cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |> filter(eventname=="3_year_follow_up_y_arm_1") |> select(src_subject_id, eventname, cbcl_scr_syn_internal_r, cbcl_scr_dsm5_depress_r)
+
+cbcl = cbcl |> filter(src_subject_id %in% ids)
+bpm = bpm |> filter(src_subject_id %in% ids)
 ```
 
-```{r}
+```{r scores}
+PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS)
+
 envRS_b = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
 names(envRS_b) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
 envRS_b = envRS_b |> select(src_subject_id, cbcl_dep_b, cbcl_int_b, depRS_b, intRS_b)
@@ -45,13 +45,13 @@ envRS_y2 = envRS_y2 |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2
 
 envRS = merge(envRS_b, envRS_y2, by="src_subject_id", all.x=T)
 scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
-
-dat_long = merge(scores, bpm)
 ```
 
-# Cross-sectional models at baseline CBCL
+# Cross-sectional, baseline CBCL
 
-Compare depRS only with adding PRS - does it explain more variance? How do the 3 different PRS compare? It looks like the hierarchical one does best. 
+Compare envRS only with adding PRS - does it explain more variance? How do the 3 different PRS compare? It looks like the hierarchical one does best. 
+
+## Depression
 
 ```{r}
 m1 = lm(cbcl_dep_b ~ depRS_b, data=scores)
@@ -79,9 +79,9 @@ summary(m4)
 performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
 ```
 
-## intRS and CBCL internalising
+## Internalising
 
-Predicting internalising is (expectedly) somewhat poor
+Predicting internalising is (expectedly) somewhat poorer as the predictors were selected for MDD.
 
 ```{r}
 m1 = lm(cbcl_int_b ~ intRS_b, data=scores)
@@ -96,6 +96,43 @@ summary(m4)
 performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
 ```
 
+# Cross-sectional BPM
+
+R square is <0.01.
+
+## depRS
+
+```{r}
+bpm_base = bpm |> filter(eventname==0.5)
+bpmscores = merge(scores, bpm_base)
+
+m1 = lm(bpm_sum ~ depRS_b, data=bpmscores)
+summary(m1)
+m2 = lm(bpm_sum ~ depRS_b + mddPRS, data=bpmscores)
+summary(m2)
+m3 = lm(bpm_sum ~ depRS_b + cfPRS, data=bpmscores)
+summary(m3)
+m4 = lm(bpm_sum ~ depRS_b + hfPRS, data=bpmscores)
+summary(m4)
+
+performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
+```
+
+
+##intRS
+
+```{r}
+m1 = lm(bpm_sum ~ intRS_b, data=bpmscores)
+summary(m1)
+m2 = lm(bpm_sum ~ intRS_b + mddPRS, data=bpmscores)
+summary(m2)
+m3 = lm(bpm_sum ~ intRS_b + cfPRS, data=bpmscores)
+summary(m3)
+m4 = lm(bpm_sum ~ intRS_b + hfPRS, data=bpmscores)
+summary(m4)
+
+performance::compare_performance(m1, m2, m3, m4, verbose = F, rank = T)
+```
 
 
 # Longitudinal BPM models?
@@ -161,7 +198,7 @@ mddm1 = lmer(bpm_sum ~ depRS_b + interview_age + I(interview_age^2)  + (1|src_su
 mddm2 = lmer(bpm_sum ~ depRS_b + scale(mddPRS) + interview_age + I(interview_age^2)  +  (1|src_subject_id), data=dat_long)
 mddm3 = lmer(bpm_sum ~ depRS_b*scale(mddPRS) + interview_age + I(interview_age^2)  + (1|src_subject_id), data=dat_long)
 
-anova(mddm0, mddm1, mddm2, mddm3) %>% as.data.frame() %>% 
+anova(m0, mddm1, mddm2, mddm3) %>% as.data.frame() %>% 
   kbl() %>% kable_styling(full_width = F)
 ```
 

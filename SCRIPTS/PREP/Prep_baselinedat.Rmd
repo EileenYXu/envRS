@@ -45,8 +45,8 @@ names(baseline) = c("src_subject_id", "tobacco_puff", "weightcontrol_ksads",
                     "serious_accident", "sleep_hrs", "bmi", "needed_food",
                     "income", "parent_ed", "birthsex", "gender",
                     "race_ethnicity","area_depriv", "comm_safety",
-                    "days_active", "agemths", "cbcl_internalising",
-                    "cbcl_dsm5_depress")
+                    "days_active", "fam_conflict", "p_monitoring", "p_depression",
+                    "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
 
 # remove empty levels
 baseline = droplevels(baseline)
