@@ -208,6 +208,7 @@ beta.1se = coefficients for lambda value that produces the most regularized mode
 
 ```{r}
 y2_coefs = rbind(coef_int[-1,], coef_dep[-1,])
+
 write.csv(y2_coefs, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/y2_coefs.csv")
 
 data.frame(predictor = coef_int[,1],
@@ -631,6 +632,7 @@ data.frame(predictor = coef_int[,1],
 
 ```{r}
 y2_coefs = rbind(coef_int[-1,], coef_dep[-1,])
+
 write.csv(y2_coefs, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/y2_coefs_sens.csv")
 
 y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.min, 3))!=0)
