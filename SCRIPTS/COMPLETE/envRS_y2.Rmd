@@ -256,18 +256,18 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.min, 3))!=0)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 
 ```{r fig.height=10, fig.width=10}
-y2_coefs_sig |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 
 ggplot(y2_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
   geom_tile(color = "white", lwd = 1, linetype = 1) +
@@ -289,13 +289,13 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.min, 3))>=0.01)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 
@@ -319,13 +319,13 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.1se, 3))!=0)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 
@@ -348,13 +348,13 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.1se, 3))>=0.01)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 
@@ -641,13 +641,13 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.min, 3))!=0)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 
@@ -670,13 +670,13 @@ y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.1se, 3))!=0)
 ### CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 ### CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl() |> kable_styling() |> scroll_box(height = "300px")
+y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
 

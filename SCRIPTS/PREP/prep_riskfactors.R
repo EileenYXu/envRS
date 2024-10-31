@@ -272,3 +272,61 @@ dat_unrelated = dat %>% filter(src_subject_id %in% unrelated)
 saveRDS(dat_unrelated, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
 
 saveRDS(dat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_allIDs.rds")
+
+#### youth ksads ####
+y_ksads = read.csv("G://data/abcd/release5.1/core/mental-health/mh_y_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_t", "ksads_1_841_t", "ksads_1_842_t", "ksads_1_843_t", "ksads_1_844_t", "ksads_1_845_t", "ksads_1_846_t", "ksads_1_847_t") |> filter(src_subject_id %in% unrelated)
+
+names(y_ksads) = c("src_subject_id", "eventname", "mdd_present", "mdd_remission", "mdd_past",
+                   "pdd_present", "pdd_remission", "pdd_past", "unspec_present", "unspec_past")
+
+y_ksads = y_ksads |> mutate(
+  across(3:ncol(y_ksads), ~as.factor(case_match(.,
+                                                0 ~ 0,
+                                                1 ~ 1,
+                                                c(555, 888) ~ NA
+  ))),
+)
+
+y_ksads = y_ksads |> mutate(
+  mdd_lifetime = as.factor(ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1, 1, 0)),
+  
+  any_lifetime = as.factor(ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1 | pdd_present==1 | pdd_remission==1 | pdd_past==1 | unspec_present==1 | unspec_past==1, 1, 0)))
+
+y_ksads_event = list(
+  base = y_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
+  y1 = y_ksads |> filter(eventname=="1_year_follow_up_y_arm_1") |> na.omit(),
+  y2 = y_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit(),
+  y3 = y_ksads |> filter(eventname=="3_year_follow_up_y_arm_1") |> na.omit(),
+  y4 = y_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
+)
+
+saveRDS(y_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/DATA/ksads_y.rds")
+
+#### parent ksads ####
+p_ksads = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_p", "ksads_1_841_p", "ksads_1_842_p", "ksads_1_843_p", "ksads_1_844_p", "ksads_1_845_p", "ksads_1_846_p", "ksads_1_847_p") |> filter(src_subject_id %in% unrelated)
+
+names(p_ksads) = c("src_subject_id", "eventname", "mdd_present", "mdd_remission", "mdd_past",
+                   "pdd_present", "pdd_remission", "pdd_past", "unspec_present", "unspec_past")
+
+p_ksads = p_ksads |> mutate(
+  across(3:ncol(p_ksads), ~as.factor(case_match(.,
+                                                0 ~ 0,
+                                                1 ~ 1,
+                                                c(555, 888) ~ NA
+  ))),
+)
+
+p_ksads = p_ksads |> mutate(
+  mdd_lifetime = as.factor(ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1, 1, 0)),
+  
+  any_lifetime = as.factor(ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1 | pdd_present==1 | pdd_remission==1 | pdd_past==1 | unspec_present==1 | unspec_past==1, 1, 0)))
+
+p_ksads_event = list(
+  base = p_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
+  y1 = p_ksads |> filter(eventname=="1_year_follow_up_y_arm_1") |> na.omit(),
+  y2 = p_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit(),
+  y3 = p_ksads |> filter(eventname=="3_year_follow_up_y_arm_1") |> na.omit(),
+  y4 = p_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
+)
+
+saveRDS(p_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/DATA/ksads_p.rds")
