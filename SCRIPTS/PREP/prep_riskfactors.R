@@ -300,7 +300,7 @@ y_ksads_event = list(
   y4 = y_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
 )
 
-saveRDS(y_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/DATA/ksads_y.rds")
+saveRDS(y_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_y.rds")
 
 #### parent ksads ####
 p_ksads = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_p", "ksads_1_841_p", "ksads_1_842_p", "ksads_1_843_p", "ksads_1_844_p", "ksads_1_845_p", "ksads_1_846_p", "ksads_1_847_p") |> filter(src_subject_id %in% unrelated)
@@ -329,4 +329,4 @@ p_ksads_event = list(
   y4 = p_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
 )
 
-saveRDS(p_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/DATA/ksads_p.rds")
+saveRDS(p_ksads_event, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_p.rds")
