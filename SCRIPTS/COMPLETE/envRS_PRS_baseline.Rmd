@@ -1,5 +1,5 @@
 ---
-title: "envRS and PRS"
+title: "Baseline envRS and PRS for longitudinal outcomes"
 output:
   html_document:
     toc: true
@@ -9,9 +9,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-# Combining envRS with PRS for longitudinal outcomes
-
-Model comparisons of envRS and PRS in predicting longitudinal outcomes.
+Baseline envRS were trained on parent-reported CBCL subscales for internalizing (intRS) and depression (depRS) symptoms. Here I am testing associations between baseline envRS and longitudinal outcomes, plus the combination of envRS and MDD3 PRS.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, results = "asis")
@@ -29,15 +27,11 @@ emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
 ```{r phenopaletteer_d()```{r phenos}
 ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrelatedIDs.rds")
 
-bpm = read.csv("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_dep_long_gen_only.csv")
-
 cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |> filter(src_subject_id %in% ids) |> select(src_subject_id, eventname, cbcl_scr_syn_internal_r, cbcl_scr_dsm5_depress_r)
 names(cbcl) = c("src_subject_id", "eventname", "int", "dep")
 
 cbcl_y3 = cbcl |> filter(eventname=="3_year_follow_up_y_arm_1")
 cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1")
-
-bpm = bpm |> filter(src_subject_id %in% ids)
 
 rm(cbcl)
 ```
@@ -45,19 +39,13 @@ rm(cbcl)
 ```{r scores}
 PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS)
 
-envRS_b = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
-names(envRS_b) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
-envRS_b = envRS_b |> select(src_subject_id, cbcl_dep_b, cbcl_int_b, depRS_b, intRS_b)
+envRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
+names(envRS) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
+envRS = envRS |> select(src_subject_id, cbcl_dep_b, cbcl_int_b, depRS_b, intRS_b)
 
-envRS_y2 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_y2.rds")
-names(envRS_y2) = c("src_subject_id", "cbcl_dep_y2", "depRS_y2", "depRS_1se", "data", "cbcl_int_y2", "intRS_y2", "intRS_1se", "data.y")
-envRS_y2 = envRS_y2 |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2, intRS_y2)
-
-envRS = merge(envRS_b, envRS_y2, by="src_subject_id", all.x=T)
 scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
 ```
 
-# Baseline envRS
 
 ```{r}
 s_dat = merge(cbcl_y3, scores, by="src_subject_id")
@@ -73,15 +61,17 @@ ggplot(dat) +
 ```
 
 
-PRS data based on MDD3 GWAS (from Poppy) were available for `r nrow(PRS)` participants. \
-At year 3, CBCL data were available for `r nrow(cbcl_y3)` participants. \
-`r nrow(s_dat)` participants have year 3 CBCL data, PRS and baseline envRS. \
+PRS data based on MDD3 GWAS (from Poppy) were available for `r nrow(PRS)` participants. At year 3, CBCL data were available for `r nrow(cbcl_y3)` participants. A total of `r nrow(s_dat)` participants have year 3 CBCL data, PRS and baseline envRS. \
+\
 Model comparisons are run for: \
+\
 m1 = cbcl ~ envRS \
 m2 = cbcl ~ envRS + PRS \
 m3 = cbcl ~ envRS*PRS \
 
-## Y3 CBCL Depression {.tabset}
+# Y3 CBCL Depression
+
+## depRS + PRS {.tabset}
 
 ### Performance metrics
 
@@ -132,7 +122,6 @@ e_dat = merge(cbcl_y3, envRS, by="src_subject_id")
 
 Uses larger sample of envRS only data (N = `r nrow(e_dat)`)
 
-
 ### Performance metrics
 
 ```{r}
@@ -174,7 +163,9 @@ kable(accs, digits = 3) |> kable_styling()
 ```
 
 
-## Y3 CBCL Internalising {.tabset}
+# Y3 CBCL Internalising
+
+## intRS + PRS {.tabset}
 
 ### Performance metrics
 
@@ -262,18 +253,21 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
-## Y4 CBCL Depression {.tabset}
+# Y4 CBCL Depression
 
 ```{r}
 s_dat = merge(cbcl_y4, scores, by="src_subject_id")
 ```
 
-At year 4, CBCL data were available for `r nrow(cbcl_y4)` participants. \
-`r nrow(s_dat)` participants have year 3 CBCL data, PRS and baseline envRS. \
+At year 4, CBCL data were available for `r nrow(cbcl_y4)` participants. A total `r nrow(s_dat)` participants have year 4 CBCL data, PRS and baseline envRS. \
+\
 Model comparisons are run for: \
+\
 m1 = cbcl ~ envRS \
 m2 = cbcl ~ envRS + PRS \
 m3 = cbcl ~ envRS*PRS \
+
+## depRS + PRS {.tabset}
 
 ### Performance metrics
 
@@ -365,8 +359,9 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
+# Y4 CBCL Internalising
 
-## Y4 CBCL Internalising {.tabset}
+## intRS + PRS {.tabset}
 
 ### Performance metrics
 
@@ -460,7 +455,7 @@ baseprs = merge(scores, mddy$base, by = "src_subject_id")
 y2prs = merge(scores, mddy$y2, by = "src_subject_id")
 ```
 
-Depression diagnoses (lifetime and current) from youth-reported KSADS are available at baseline (N=`r nrow(basedat)`) and year 2 (N=`r nrow(y2dat)`). \
+Depression diagnoses (lifetime and current) from *youth-reported* KSADS are available at baseline (N=`r nrow(basedat)`) and year 2 (N=`r nrow(y2dat)`). \
 
 
 # Baseline (cross-sectional)
@@ -469,58 +464,9 @@ For envRS-only analyses, there are `r nrow(filter(basedat, mdd_lifetime==1))` li
 \
 Of those with both envRS and PRS at baseline (N = `r nrow(baseprs)`), there are `r nrow(filter(baseprs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(baseprs, mdd_present==1))` current MDD cases and `r nrow(filter(baseprs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
 \
-*Current analyses use just the lifetime MDD outcome*
+Current analyses use *just* the lifetime MDD outcome.
 
-## envRS combined {.tabset}
 
-### Performance metrics
-
-```{r}
-depRS = glm(mdd_lifetime ~ depRS_b, basedat, family = binomial(link = "logit"))
-intRS = glm(mdd_lifetime ~ intRS_b, basedat, family = binomial(link = "logit"))
-combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, basedat, family = binomial(link = "logit"))
-interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, basedat, family = binomial(link = "logit"))
-
-mods = list(
-  "depRS" = depRS,
-  "intRS" = intRS,
-  "combRS" = combRS,
-  "interact" = interactRS
-)
-```
-
-```{r}
-compare_performance(mods, verbose = F) |> display(digits=3)
-```
-
-### Model comparisons
-
-```{r}
-test_performance(mods[c(1, 3, 4)]) |> display(digits=3)
-test_performance(mods[c(2, 3, 4)]) |> display(digits=3)
-```
-
-### Plot
-
-```{r}
-compare_performance(mods, verbose = F) |> 
-  plot()
-```
-
-```{r eval=FALSE}
-check_model(int_mod)
-check_model(comb_mod)
-```
-
-### Estimates
-
-```{r}
-sjPlot::tab_model(mods, dv.labels = c("depRS", "intRS", "depRS+intRS", "depRS*intRS"), collapse.ci = T, show.se = T, show.stat = T)
-
-accs = lapply(mods, performance_accuracy) 
-accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
-kable(accs, digits = 3) |> kable_styling()
-```
 
 ## depRS + PRS {.tabset}
 
@@ -610,24 +556,15 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
-# Y2 (longitudinal)
-
-For envRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
-\
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
-\
-*Current analyses use just the lifetime MDD outcome*
-
-
 ## envRS combined {.tabset}
 
 ### Performance metrics
 
 ```{r}
-depRS = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
-intRS = glm(mdd_lifetime ~ intRS_b, y2dat, family = binomial(link = "logit"))
-combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, y2dat, family = binomial(link = "logit"))
-interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, y2dat, family = binomial(link = "logit"))
+depRS = glm(mdd_lifetime ~ depRS_b, basedat, family = binomial(link = "logit"))
+intRS = glm(mdd_lifetime ~ intRS_b, basedat, family = binomial(link = "logit"))
+combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, basedat, family = binomial(link = "logit"))
+interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, basedat, family = binomial(link = "logit"))
 
 mods = list(
   "depRS" = depRS,
@@ -669,6 +606,16 @@ accs = lapply(mods, performance_accuracy)
 accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
+
+# Y2 (longitudinal)
+
+For envRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+*Current analyses use just the lifetime MDD outcome*
+
+
 
 ## depRS + PRS {.tabset}
 
@@ -752,6 +699,57 @@ check_model(comb_mod)
 
 ```{r}
 sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+## envRS combined {.tabset}
+
+### Performance metrics
+
+```{r}
+depRS = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+intRS = glm(mdd_lifetime ~ intRS_b, y2dat, family = binomial(link = "logit"))
+combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, y2dat, family = binomial(link = "logit"))
+interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, y2dat, family = binomial(link = "logit"))
+
+mods = list(
+  "depRS" = depRS,
+  "intRS" = intRS,
+  "combRS" = combRS,
+  "interact" = interactRS
+)
+```
+
+```{r}
+compare_performance(mods, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(mods[c(1, 3, 4)]) |> display(digits=3)
+test_performance(mods[c(2, 3, 4)]) |> display(digits=3)
+```
+
+### Plot
+
+```{r}
+compare_performance(mods, verbose = F) |> 
+  plot()
+```
+
+```{r eval=FALSE}
+check_model(int_mod)
+check_model(comb_mod)
+```
+
+### Estimates
+
+```{r}
+sjPlot::tab_model(mods, dv.labels = c("depRS", "intRS", "depRS+intRS", "depRS*intRS"), collapse.ci = T, show.se = T, show.stat = T)
 
 accs = lapply(mods, performance_accuracy) 
 accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
@@ -770,7 +768,7 @@ y2prs = merge(scores, mddp$base, by = "src_subject_id")
 y2prs = merge(scores, mddp$y2, by = "src_subject_id")
 ```
 
-Depression diagnoses (lifetime and current) from parent-reported KSADS are available at baseline (N=`r nrow(basedat)`) and year 2 (N=`r nrow(y2dat)`). \
+Depression diagnoses (lifetime and current) from *parent-reported* KSADS are available at baseline (N=`r nrow(basedat)`) and year 2 (N=`r nrow(y2dat)`). \
 
 
 # Baseline (cross-sectional)
@@ -781,56 +779,7 @@ Of those with both envRS and PRS at baseline (N = `r nrow(baseprs)`), there are 
 \
 *Current analyses use just the lifetime MDD outcome*
 
-## envRS combined {.tabset}
 
-### Performance metrics
-
-```{r}
-depRS = glm(mdd_lifetime ~ depRS_b, basedat, family = binomial(link = "logit"))
-intRS = glm(mdd_lifetime ~ intRS_b, basedat, family = binomial(link = "logit"))
-combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, basedat, family = binomial(link = "logit"))
-interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, basedat, family = binomial(link = "logit"))
-
-mods = list(
-  "depRS" = depRS,
-  "intRS" = intRS,
-  "combRS" = combRS,
-  "interact" = interactRS
-)
-```
-
-```{r}
-compare_performance(mods, verbose = F) |> display(digits=3)
-```
-
-### Model comparisons
-
-```{r}
-test_performance(mods[c(1, 3, 4)]) |> display(digits=3)
-test_performance(mods[c(2, 3, 4)]) |> display(digits=3)
-```
-
-### Plot
-
-```{r}
-compare_performance(mods, verbose = F) |> 
-  plot()
-```
-
-```{r eval=FALSE}
-check_model(int_mod)
-check_model(comb_mod)
-```
-
-### Estimates
-
-```{r}
-sjPlot::tab_model(mods, dv.labels = c("depRS", "intRS", "depRS+intRS", "depRS*intRS"), collapse.ci = T, show.se = T, show.stat = T)
-
-accs = lapply(mods, performance_accuracy) 
-accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
-kable(accs, digits = 3) |> kable_styling()
-```
 
 ## depRS + PRS {.tabset}
 
@@ -920,23 +869,15 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
-# Y2 (longitudinal)
-
-For envRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
-\
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
-\
-*Current analyses use just the lifetime MDD outcome*
-
 ## envRS combined {.tabset}
 
 ### Performance metrics
 
 ```{r}
-depRS = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
-intRS = glm(mdd_lifetime ~ intRS_b, y2dat, family = binomial(link = "logit"))
-combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, y2dat, family = binomial(link = "logit"))
-interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, y2dat, family = binomial(link = "logit"))
+depRS = glm(mdd_lifetime ~ depRS_b, basedat, family = binomial(link = "logit"))
+intRS = glm(mdd_lifetime ~ intRS_b, basedat, family = binomial(link = "logit"))
+combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, basedat, family = binomial(link = "logit"))
+interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, basedat, family = binomial(link = "logit"))
 
 mods = list(
   "depRS" = depRS,
@@ -978,6 +919,17 @@ accs = lapply(mods, performance_accuracy)
 accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
+
+# Y2 (longitudinal)
+
+For envRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+\
+Current analyses use *just* the lifetime MDD outcome. \
+\
+
 
 ## depRS + PRS {.tabset}
 
@@ -1061,6 +1013,57 @@ check_model(comb_mod)
 
 ```{r}
 sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+## envRS combined {.tabset}
+
+### Performance metrics
+
+```{r}
+depRS = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+intRS = glm(mdd_lifetime ~ intRS_b, y2dat, family = binomial(link = "logit"))
+combRS = glm(mdd_lifetime ~ depRS_b + intRS_b, y2dat, family = binomial(link = "logit"))
+interactRS = glm(mdd_lifetime ~ depRS_b*intRS_b, y2dat, family = binomial(link = "logit"))
+
+mods = list(
+  "depRS" = depRS,
+  "intRS" = intRS,
+  "combRS" = combRS,
+  "interact" = interactRS
+)
+```
+
+```{r}
+compare_performance(mods, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(mods[c(1, 3, 4)]) |> display(digits=3)
+test_performance(mods[c(2, 3, 4)]) |> display(digits=3)
+```
+
+### Plot
+
+```{r}
+compare_performance(mods, verbose = F) |> 
+  plot()
+```
+
+```{r eval=FALSE}
+check_model(int_mod)
+check_model(comb_mod)
+```
+
+### Estimates
+
+```{r}
+sjPlot::tab_model(mods, dv.labels = c("depRS", "intRS", "depRS+intRS", "depRS*intRS"), collapse.ci = T, show.se = T, show.stat = T)
 
 accs = lapply(mods, performance_accuracy) 
 accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
