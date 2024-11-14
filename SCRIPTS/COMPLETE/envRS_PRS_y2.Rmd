@@ -27,15 +27,14 @@ emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
 ```{r phenopaletteer_d()```{r phenos}
 ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrelatedIDs.rds")
 
-bpm = read.csv("G://users/eileen/ABCD/PRS_ABCD_Eileen/abcd_dep_long_gen_only.csv")
-
 cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |> filter(src_subject_id %in% ids) |> select(src_subject_id, eventname, cbcl_scr_syn_internal_r, cbcl_scr_dsm5_depress_r)
 names(cbcl) = c("src_subject_id", "eventname", "int", "dep")
 
 cbcl_y3 = cbcl |> filter(eventname=="3_year_follow_up_y_arm_1")
 cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1")
 
-bpm = bpm |> filter(src_subject_id %in% ids)
+cbcl_y3[,3:4] = apply(cbcl_y3[,3:4], 2, scale)
+cbcl_y4[,3:4] = apply(cbcl_y4[,3:4], 2, scale)
 
 rm(cbcl)
 ```
@@ -48,6 +47,8 @@ names(envRS) = c("src_subject_id", "cbcl_dep_y2", "depRS_y2", "depRS_1se", "data
 envRS = envRS |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2, intRS_y2)
 
 scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
+
+scores[,2:6] = apply(scores[,2:6], 2, scale)
 ```
 
 ```{r}

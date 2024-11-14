@@ -33,6 +33,9 @@ names(cbcl) = c("src_subject_id", "eventname", "int", "dep")
 cbcl_y3 = cbcl |> filter(eventname=="3_year_follow_up_y_arm_1")
 cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1")
 
+cbcl_y3[,3:4] = apply(cbcl_y3[,3:4], 2, scale)
+cbcl_y4[,3:4] = apply(cbcl_y4[,3:4], 2, scale)
+
 rm(cbcl)
 ```
 
@@ -44,6 +47,8 @@ names(envRS) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data",
 envRS = envRS |> select(src_subject_id, cbcl_dep_b, cbcl_int_b, depRS_b, intRS_b)
 
 scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
+
+scores[,2:6] = apply(scores[,2:6], 2, scale)
 ```
 
 
