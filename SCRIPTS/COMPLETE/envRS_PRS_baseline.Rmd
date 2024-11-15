@@ -769,7 +769,7 @@ mddp = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksad
 basedat = merge(envRS, mddp$base, by = "src_subject_id")
 y2dat = merge(envRS, mddp$y2, by = "src_subject_id")
 
-y2prs = merge(scores, mddp$base, by = "src_subject_id")
+baseprs = merge(scores, mddp$base, by = "src_subject_id")
 y2prs = merge(scores, mddp$y2, by = "src_subject_id")
 ```
 
