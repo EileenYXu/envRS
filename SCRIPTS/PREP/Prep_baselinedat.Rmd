@@ -29,6 +29,8 @@ Total N = 9802 \
 40% = 3920 \
 50% = 4901 \
 
+Risk factors with >20% missing data were removed.
+
 Due to TLFB screening out those who haven't heard of or tried the drug (more than a sip or a puff), NAs most likely to be 0. With how rare these events are at this age though (`r round(min(baseline$interview_age, na.rm=T)/12, 2)` - `r round(max(baseline$interview_age, na.rm=T)/12, 2)`) years, it may be worth removing this variable and examining it at year 2 instead of baseline. Similarly, it may be better to remove illicit drugs from baseline analyses. When restricting variables to have no more than 20% missing data, tlfb for alcohol, cannabis and number of use days are excluded as predictors. Tobacco puff is still included.
 
 Note on the "gender" variable: this is coded based on child's (parent-) reported gender identity. M includes cis and trans males, F includes cis and trans females, GNC = gender non-conforming, combines "GNC" and "Different" from ABCD. I will include both sex at birth ('birthsex')  and gender ('gender') in the saved data but it would be nice to use gender (might have to remove the few GNC as the interactions wouldn't really make sense with so few) - can run with birthsex as a sensitivity analysis. 

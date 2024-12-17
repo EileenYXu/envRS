@@ -1,5 +1,6 @@
 ---
 title: "Combining depRS and PRS for longitudinal depression"
+date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
