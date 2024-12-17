@@ -1,0 +1,372 @@
+---
+title: "Combining depRS and PRS for longitudinal depression"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+editor_options:
+  chunk_output_type: console
+---
+
+This script contains the longitudinal analyses that will be included in the main manuscript. Cross-sectional depRS for baseline and year 2 data were trained on (standardised) CBCL DSM5-oriented depression subscale scores, PRS were based on the MDD3 GWAS. All continuous variables have been mean centred and standardised for comparison of effect sizes. Longitudinal outcomes examined here are **CBCL DSM-5 oriented depression subscale** at (a) Year 3 and (b) Year 4, and **Lifetime MDD status** at Year 2 which was either (c) Self-reported or (d) Parent-reported. Longitudinal analyses of depRS at year 2 looked at e) Year 3 CBCL and (f) Year 4 CBCL.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, results = "asis")
+library(tidyverse)
+library(lme4)
+library(kableExtra)
+library(lmerTest)
+library(emmeans)
+library(performance)
+library(pROC)
+pal = paletteer::paletteer_d("colorblindr::OkabeIto")
+
+emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
+```
+
+```{r}
+ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrelatedIDs.rds")
+
+cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |> filter(src_subject_id %in% ids) |> select(src_subject_id, eventname, cbcl_scr_syn_internal_r, cbcl_scr_dsm5_depress_r)
+names(cbcl) = c("src_subject_id", "eventname", "int", "dep")
+
+cbcl_y3 = cbcl |> filter(eventname=="3_year_follow_up_y_arm_1") |> mutate(across("int":"dep", scale))
+cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1") |> 
+  mutate(across("int":"dep", scale))
+
+rm(cbcl)
+```
+
+```{r scores}
+PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS) |> mutate(across(where(is.numeric), scale))
+
+envRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
+names(envRS) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
+envRS = envRS |> select(src_subject_id, depRS_b, intRS_b) |> mutate(across(where(is.numeric), scale))
+
+scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
+```
+
+# Baseline depRS
+
+PRS data based on MDD3 GWAS (from Poppy) were available for `r nrow(PRS)` participants. 
+
+## (a) Y3 CBCL Depression {.tabset}
+
+```{r}
+y3_dat = merge(cbcl_y3, scores, by = "src_subject_id")
+```
+
+At year 3, CBCL data were available for `r nrow(cbcl_y3)` participants. A total of `r nrow(y3_dat)` participants have year 3 CBCL data, PRS and baseline envRS. \
+\
+Model comparisons are run for: \
+\
+m1 = cbcl ~ depRS \
+m2 = cbcl ~ depRS + PRS \
+m3 = cbcl ~ depRS*PRS \
+
+
+### Performance metrics
+
+```{r}
+m1 = lm(dep ~ depRS_b, data = y3_dat)
+m2 = lm(dep ~ depRS_b + PRS, data = y3_dat)
+m3 = lm(dep ~ depRS_b*PRS, data = y3_dat)
+
+compare_performance(m1, m2, m3, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(m1, m2, m3) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+mods = list("m1" = m1, "m2" = m2, "m3" = m3)
+
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+
+## (b) Y4 CBCL Depression {.tabset}
+
+```{r}
+y4_dat = merge(cbcl_y4, scores, by="src_subject_id")
+```
+
+At year 4, CBCL data were available for `r nrow(cbcl_y4)` participants. A total `r nrow(y4_dat)` participants have year 4 CBCL data, PRS and baseline envRS. \
+\
+Model comparisons are run for: \
+\
+m1 = cbcl ~ envRS \
+m2 = cbcl ~ envRS + PRS \
+m3 = cbcl ~ envRS*PRS \
+
+### Performance metrics
+
+```{r}
+m1 = lm(dep ~ depRS_b, data = y4_dat)
+m2 = lm(dep ~ depRS_b + PRS, data = y4_dat)
+m3 = lm(dep ~ depRS_b*PRS, data = y4_dat)
+
+compare_performance(m1, m2, m3, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(m1, m2, m3) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+mods = list("m1" = m1, "m2" = m2, "m3" = m3)
+
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+## (c) 2-year lifetime MDD diagnosis (youth) {.tabset}
+
+```{r}
+mddy = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_y.rds")
+y2dat = merge(envRS, mddy$y2, by = "src_subject_id")
+y2prs = merge(scores, mddy$y2, by = "src_subject_id")
+```
+
+For depRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+
+### depRS only
+
+```{r}
+depmod = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
+
+performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
+```
+
+
+### Performance metrics
+
+```{r}
+m1 = glm(mdd_lifetime ~ depRS_b, y2prs, family = binomial(link = "logit"))
+m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs, family = binomial(link = "logit"))
+m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs, family = binomial(link = "logit"))
+
+mods = list(m1, m2, m3)
+
+compare_performance(mods, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(mods) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+### ROC curves
+
+```{r}
+#ROC curves for each model
+roc_depRS = roc(y2dat$mdd_lifetime, depmod$fitted.values)
+# roc_m1 = roc(y2prs$mdd_lifetime, m1$fitted.values) same as depression only, but much fewer data points
+roc_m2 = roc(y2prs$mdd_lifetime, m2$fitted.values)
+roc_m3 = roc(y2prs$mdd_lifetime, m3$fitted.values)
+
+ggroc(list("depRS" = roc_depRS, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
+  scale_color_manual(values = pal) +
+  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dotted") +
+  theme_bw() + 
+  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+```
+
+
+## (d) 2-year lifetime MDD diagnosis (parent) {.tabset}
+
+```{r}
+mddp = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_p.rds")
+y2dat = merge(envRS, mddp$y2, by = "src_subject_id")
+y2prs = merge(scores, mddp$y2, by = "src_subject_id")
+```
+
+For depRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+\
+
+### depRS only
+
+```{r}
+depmod = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
+
+performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
+```
+
+### Performance metrics
+
+```{r}
+m1 = glm(mdd_lifetime ~ depRS_b, y2prs, family = binomial(link = "logit"))
+m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs, family = binomial(link = "logit"))
+m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs, family = binomial(link = "logit"))
+
+mods = list(m1, m2, m3)
+
+compare_performance(mods, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(mods) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+### ROC curves
+
+```{r}
+#ROC curves for each model
+roc_depRS = roc(y2dat$mdd_lifetime, depmod$fitted.values)
+# roc_m1 = roc(y2prs$mdd_lifetime, m1$fitted.values) same as depression only, but much fewer data points
+roc_m2 = roc(y2prs$mdd_lifetime, m2$fitted.values)
+roc_m3 = roc(y2prs$mdd_lifetime, m3$fitted.values)
+
+ggroc(list("depRS" = roc_depRS, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
+  scale_color_manual(values = pal) +
+  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dotted") +
+  theme_bw() + 
+  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+```
+
+# Year 2 depRS
+
+## Y3 CBCL Depression {.tabset}
+
+using year 2 envRS scores.
+
+```{r}
+envRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_y2.rds")
+names(envRS) = c("src_subject_id", "cbcl_dep_y2", "depRS_y2", "depRS_1se", "data", "cbcl_int_y2", "intRS_y2", "intRS_1se", "data.y")
+envRS = envRS |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2, intRS_y2)
+```
+
+```{r}
+y2scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
+
+y3_dat = merge(cbcl_y3, y2scores, by = "src_subject_id")
+```
+
+At year 3, CBCL data were available for `r nrow(cbcl_y3)` participants. A total of `r nrow(y3_dat)` participants have year 3 CBCL data, PRS and baseline envRS. \
+\
+Model comparisons are run for: \
+\
+m1 = cbcl ~ depRS \
+m2 = cbcl ~ depRS + PRS \
+m3 = cbcl ~ depRS*PRS \
+
+
+### Performance metrics
+
+```{r}
+m1 = lm(dep ~ depRS_y2, data = y3_dat)
+m2 = lm(dep ~ depRS_y2 + PRS, data = y3_dat)
+m3 = lm(dep ~ depRS_y2*PRS, data = y3_dat)
+
+compare_performance(m1, m2, m3, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(m1, m2, m3) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+mods = list("m1" = m1, "m2" = m2, "m3" = m3)
+
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```
+
+
+## Y4 CBCL Depression {.tabset}
+
+```{r}
+y4_dat = merge(cbcl_y4, y2scores, by="src_subject_id")
+```
+
+At year 4, CBCL data were available for `r nrow(cbcl_y4)` participants. A total `r nrow(y4_dat)` participants have year 4 CBCL data, PRS and baseline envRS. \
+\
+Model comparisons are run for: \
+\
+m1 = cbcl ~ envRS \
+m2 = cbcl ~ envRS + PRS \
+m3 = cbcl ~ envRS*PRS \
+
+### Performance metrics
+
+```{r}
+m1 = lm(dep ~ depRS_y2, data = y4_dat)
+m2 = lm(dep ~ depRS_y2 + PRS, data = y4_dat)
+m3 = lm(dep ~ depRS_y2*PRS, data = y4_dat)
+
+compare_performance(m1, m2, m3, verbose = F) |> display(digits=3)
+```
+
+### Model comparisons
+
+```{r}
+test_performance(m1, m2, m3) |> display(digits=3)
+```
+
+### Estimates
+
+```{r}
+mods = list("m1" = m1, "m2" = m2, "m3" = m3)
+
+sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.se = T, show.stat = T)
+
+accs = lapply(mods, performance_accuracy) 
+accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
+kable(accs, digits = 3) |> kable_styling()
+```

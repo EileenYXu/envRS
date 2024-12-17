@@ -1,0 +1,366 @@
+---
+title: "ABCDv5.1 Baseline Scores"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: true
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, results = "asis")
+library(tidyverse)
+library(RColorBrewer)
+library(glmnet)
+library(kableExtra)
+pal = paletteer::paletteer_d("colorblindr::OkabeIto")
+set.seed(2024)
+```
+
+# Elastic net linear regression using 'glmnet'
+
+Predictors identified from quantitative reviews of adolescent MDD risk factors in baseline ABCD data are included in the model, along with interactions with gender (parent-reported child gender identity). I will also fit a model with interactions with birth sex too as a sensitivity analysis. 
+
+```{r}
+## read in data, remove missing data and exclude individuals identifying as GNC (too few for meaningful effect from interaction I think)
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
+
+trainIDs = train$src_subject_id
+testIDs = test$src_subject_id
+
+## scale and centre numeric variables
+numcols = names(train)[lapply(train, is.numeric)==T]
+train = train |> mutate_at(numcols, ~ c(scale(.)) )
+test = test |> mutate_at(numcols, ~ c(scale(.)) )
+
+## remove columns that are not used for training data
+x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
+
+## make interactions
+x_interact = x[,-grep("gender", colnames(x))] * as.numeric(train$gender)
+colnames(x_interact) = paste0(colnames(x_interact), "_gender")
+
+## same for test data
+test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
+
+test_pred_interact = test_pred[,-grep("gender", colnames(test_pred))] * as.numeric(test$gender)
+colnames(test_pred_interact) = paste0(colnames(test_pred_interact), "_gender")
+
+## data for model
+preds = cbind(x, x_interact)
+dep = train$cbcl_dsm5_depress
+int = train$cbcl_internalising
+
+testpreds = cbind(test_pred, test_pred_interact)
+rm(x_interact, test_pred, test_pred_interact, numcols)
+```
+
+80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. Each elastic net model is run with 10-fold cross-validation and lambda values are selected based on minimising the model mean squared error (MSE). `r ncol(x)` predictors were included, plus gender interactions, yielding `r ncol(preds)` predictors in total.
+
+# CBCL DSM5-oriented depression subscale {.tabset}
+
+## Cross-validation
+
+```{r}
+## assign each observation to a fold so that I can cross-validate alpha
+foldid = sample(1:10, size = length(dep), replace = TRUE)
+alphas = seq(0, 1, by = 0.1)
+
+## use for loop to cross-validate alphas
+depfits = list()
+for(i in 1:length(alphas)) {
+  depfits[[paste0("alpha_", alphas[i])]] = cv.glmnet(x = preds, y = dep, foldid = foldid, type.measure = "deviance", alpha = alphas[i])
+}
+
+## use for loop to get fit statistics for each alpha value in training data
+trainfits = list()
+for (i in 1:length(depfits)) {
+  trainfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = preds, newy = dep, s = "lambda.min")
+}
+
+## same thing for test data
+testfits = list()
+for (i in 1:length(depfits)) {
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+}
+
+## extract MSE for training and test data and print this as a table
+train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
+test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
+
+data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
+
+## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
+plot(log(depfits[[1]]$lambda), depfits[[1]]$cvm, col = pal[1], type = "l",
+     xlab = "log(Lambda)", ylab = "Mean cross-validated error")
+for (i in 2:length(depfits)) {
+  lines(log(depfits[[i]]$lambda), depfits[[i]]$cvm, col = pal[i])
+}
+legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
+```
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
+
+```{r results='hide'}
+depcoef = coef(depfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
+names(depcoef)[2] = "depRS"
+```
+
+## Plot predictions
+
+```{r}
+depRS_train = data.frame(
+  src_subject_id = trainIDs,
+  cbcl_dep = dep,
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = preds, s = "lambda.min"),
+  data = rep("train", times= length(dep))
+)
+
+depRS_test = data.frame(
+  src_subject_id = testIDs,
+  cbcl_dep = test$cbcl_dsm5_depress,
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  data = rep("test", times = nrow(test))
+)
+
+depRS = rbind(depRS_train, depRS_test)
+```
+
+```{r}
+ggplot(depRS, aes(y = cbcl_dep, x = lambda.min, colour = data)) +
+  geom_smooth() +
+  theme_bw() +
+  labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
+```
+
+# CBCL internalising subscale {.tabset}
+
+## Cross-validation
+
+```{r}
+## assign each observation to a fold so that I can cross-validate alpha
+foldid = sample(1:10, size = length(int), replace = TRUE)
+alphas = seq(0, 1, by = 0.1)
+
+## use for loop to cross-validate alphas
+intfits = list()
+for(i in 1:length(alphas)) {
+  intfits[[paste0("alpha_", alphas[i])]] = cv.glmnet(x = preds, y = int, foldid = foldid, type.measure = "deviance", alpha = alphas[i])
+}
+
+## use for loop to get fit statistics for each alpha value in training data
+trainfits = list()
+for (i in 1:length(intfits)) {
+  trainfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = preds, newy = int, s = "lambda.min")
+}
+
+## same thing for test data
+testfits = list()
+for (i in 1:length(intfits)) {
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = testpreds, newy = test$cbcl_internalising, s = "lambda.min")
+}
+
+## extract MSE for training and test data and print this as a table
+train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
+test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
+
+data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
+
+## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
+plot(log(intfits[[1]]$lambda), intfits[[1]]$cvm, col = pal[1], type = "l",
+     xlab = "log(Lambda)", ylab = "Mean cross-validated error")
+for (i in 2:length(intfits)) {
+  lines(log(intfits[[i]]$lambda), intfits[[i]]$cvm, col = pal[i])
+}
+legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
+```
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
+
+```{r results='hide'}
+intcoef = coef(intfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
+names(intcoef)[2] = "intRS"
+```
+
+## Plot predictions
+
+```{r}
+intRS_train = data.frame(
+  src_subject_id = trainIDs,
+  cbcl_int = int,
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = preds, s = "lambda.min"),
+  data = rep("train", times= length(int))
+)
+
+intRS_test = data.frame(
+  src_subject_id = testIDs,
+  cbcl_int = test$cbcl_internalising,
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  data = rep("test", times = nrow(test))
+)
+
+intRS = rbind(intRS_train, intRS_test)
+```
+
+```{r}
+ggplot(intRS, aes(y = cbcl_int, x = lambda.min, colour = data)) +
+  geom_smooth() +
+  theme_bw() +
+  labs(x = "predicted intRS", y = "CBCL internalising (scaled and centred)")
+```
+
+
+# Coefficients {.tabset}
+
+## Plot
+
+```{r}
+base_coefs = merge(depcoef, intcoef)
+
+# make row names the first column
+base_coefs = base_coefs
+
+write.csv(base_coefs, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/base_coefs.csv")
+
+#base_coefs[-1] |> 
+#  kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+```
+
+```{r fig.height=20, fig.width=10, fig.cap="Nonzero"}
+## plot coefficients for depRS and intRS
+coef_long = pivot_longer(base_coefs[-1,], cols = c("depRS", "intRS"), names_to = "out", values_to = "beta.min")
+
+base_coefs_sig = coef_long |> filter(abs(round(beta.min, 3))!=0)
+
+## pivot this back to wide
+coefs_sig = base_coefs_sig |> pivot_wider(names_from = out, values_from = beta.min)
+
+write.csv(coefs_sig, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/base_coefs_sig.csv")
+```
+
+```{r fig.height=15, fig.width=10}
+ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised \n Beta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/baseline_coefs_sig.svg", height = 200, width = 200, units = "mm")
+```
+
+## CBCL depression
+
+```{r}
+## nonzero coefficients for depression only
+depcoef[order(depcoef$depRS, decreasing = T),] |> filter(abs(depRS)!=0) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+```
+
+## CBCL internalising
+
+```{r}
+intcoef[order(intcoef$intRS, decreasing = T),] |> filter(abs(intRS)!=0) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+```
+
+# Coefficients > 0.1 {.tabset}
+
+```{r}
+## filter coefficients to absolute value > 0.1
+coef_01 = base_coefs_sig |> filter(abs(beta.min)>=0.1)
+```
+
+## Plot
+
+```{r fig.width=10, fig.height=10}
+ggplot(coef_01, aes(x = out, y = preds, fill = beta.min)) +
+  geom_tile(color = "white", lwd = 1, linetype = 1) +
+  geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
+  scale_fill_gradient2(name = "Standardised \n Beta", low = "#2166AC", high = "#B2182B") +
+  xlab(NULL) + ylab(NULL) +
+  theme(panel.grid = element_blank(), panel.background = element_blank(), 
+        axis.text = element_text(size = 12), legend.title = element_text(size=12))
+
+ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/baseline_01.svg", height = 140, width = 200, units = "mm")
+```
+
+## CBCL depression
+
+```{r}
+depcoef[order(depcoef$depRS, decreasing = T),] |> filter(abs(depRS)>=0.01) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+```
+
+## CBCL internalising
+
+```{r}
+intcoef[order(intcoef$intRS, decreasing = T),] |> filter(abs(intRS)>=0.01) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+```
+
+
+# Correlation plots {.tabset}
+
+## Whole sample
+
+```{r fig.width=10, fig.height=10}
+train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(gender != "GNC") #6090 individuals
+test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(gender != "GNC") #1499
+
+rbind(train, test) |> select(-src_subject_id, -race_ethnicity) |> data.matrix() |> 
+cor() |> 
+corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+## Training sample
+
+```{r fig.width=10, fig.height=10}
+## do the same plot here as for the whole sample correlation
+train |> select(-src_subject_id, -race_ethnicity) |> 
+  data.matrix() |> 
+cor() |> 
+corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+## Test sample
+
+```{r fig.width=10, fig.height=10}
+## do the same plot here as for the whole sample correlation
+test |> select(-src_subject_id, -race_ethnicity) |> 
+  data.matrix() |> 
+cor() |> 
+corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
+  theme(panel.grid = element_blank(), panel.background = element_blank())
+```
+
+# Descriptives {.tabset}
+
+## Whole sample
+
+```{r results='asis'}
+summarytools::dfSummary(rbind(train, test)[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+## Training sample
+
+```{r results='asis'}
+summarytools::dfSummary(train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+## Test sample
+
+```{r results='asis'}
+summarytools::dfSummary(test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+
+ 

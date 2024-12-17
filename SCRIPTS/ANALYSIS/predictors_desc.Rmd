@@ -1,0 +1,44 @@
+---
+title: "Data descriptions all sweeps"
+author: "Eileen Xu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(kableExtra)
+```
+
+```{r}
+dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
+
+names(dat)
+
+preds = dat |> select(-src_subject_id, -site_id_l, -rel_family_id, -rel_birth_id,
+                      -school_id, -district_id, -interview_date, -interview_age,
+                      -visit_type, -cbcl_scr_syn_internal_r, -cbcl_scr_dsm5_depress_r)
+```
+
+```{r}
+base_preds = preds |> filter(eventname=="baseline_year_1_arm_1") %>% select_if(~ !all(is.na(.))) |> droplevels()
+
+y2_preds = preds |> filter(eventname=="2_year_follow_up_y_arm_1") %>% select_if(~ !all(is.na(.))) |> droplevels()
+```
+
+## N missing
+
+```{r}
+preds$eventname = factor(preds$eventname, levels = c("baseline_year_1_arm_1", "1_year_follow_up_y_arm_1", "2_year_follow_up_y_arm_1", "3_year_follow_up_y_arm_1", "4_year_follow_up_y_arm_1"))
+
+preds[grep("baseline|2_year",preds$eventname),] |> group_by(eventname) |> summarise(across(everything(), ~ sum(is.na(.)), .names = "{col}")) |> t() |> kbl(digits = 3) |> kable_styling()
+```
+
+## Percent missing
+
+```{r}
+preds |> group_by(eventname) |> summarise(across(everything(), ~ sum(is.na(.))/n(), .names = "{col}")) |> t() |> kbl(digits = 3) |> kable_styling()
+```
+
