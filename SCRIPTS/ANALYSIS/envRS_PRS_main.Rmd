@@ -10,7 +10,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-This script contains the longitudinal analyses that will be included in the main manuscript. Cross-sectional depRS for baseline and year 2 data were trained on (standardised) CBCL DSM5-oriented depression subscale scores, PRS were based on the MDD3 GWAS. All continuous variables have been mean centred and standardised for comparison of effect sizes. Longitudinal outcomes examined here are **CBCL DSM-5 oriented depression subscale** at (a) Year 3 and (b) Year 4, and **Lifetime MDD status** at Year 2 which was either (c) Self-reported or (d) Parent-reported. Longitudinal analyses of depRS at year 2 looked at e) Year 3 CBCL and (f) Year 4 CBCL.
+This script contains the longitudinal analyses that will be included in the main manuscript. Cross-sectional depRS for baseline and year 2 data were trained on (standardised) CBCL DSM5-oriented depression subscale scores, PRS were based on the MDD3 GWAS. All continuous variables have been mean centred and standardised for comparison of effect sizes. Longitudinal outcomes examined here are **CBCL DSM-5 oriented depression subscale** at (a) Year 3 and (b) Year 4, and **Lifetime MDD status** at Year 2 which was either (c) Self-reported or (d) Parent-reported. Longitudinal analyses of depRS at year 2 looked at (e) Year 3 CBCL and (f) Year 4 CBCL.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, results = "asis")
@@ -21,6 +21,8 @@ library(lmerTest)
 library(emmeans)
 library(performance)
 library(pROC)
+library(summarytools)
+define_keywords(title.dfSummary = "NA")
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 
 emm_options(lmerTest.limit = 30000, pbkrtest.limit = 30000)
@@ -32,11 +34,15 @@ ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrel
 cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |> filter(src_subject_id %in% ids) |> select(src_subject_id, eventname, cbcl_scr_syn_internal_r, cbcl_scr_dsm5_depress_r)
 names(cbcl) = c("src_subject_id", "eventname", "int", "dep")
 
+lt = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_y_lt.csv") |> filter(src_subject_id %in% ids) |> 
+  select(src_subject_id, eventname, interview_age) |> 
+  mutate(age_yrs = interview_age/12)
+
+cbcl = merge(lt, cbcl, by = c("src_subject_id", "eventname"))
+
 cbcl_y3 = cbcl |> filter(eventname=="3_year_follow_up_y_arm_1") |> mutate(across("int":"dep", scale))
 cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1") |> 
   mutate(across("int":"dep", scale))
-
-rm(cbcl)
 ```
 
 ```{r scores}
@@ -96,6 +102,12 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
+### Data description
+
+```{r}
+y3_dat |> select(age_yrs, dep, depRS_b) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
 
 ## (b) Y4 CBCL Depression {.tabset}
 
@@ -139,35 +151,51 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
+### Data description
+
+```{r}
+y4_dat |> select(age_yrs, dep, depRS_b) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+
 ## (c) 2-year lifetime MDD diagnosis (youth) {.tabset}
 
 ```{r}
 mddy = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_y.rds")
-y2dat = merge(envRS, mddy$y2, by = "src_subject_id")
-y2prs = merge(scores, mddy$y2, by = "src_subject_id")
+
+mddy = lapply(mddy, function(x) {
+  y = merge(x, lt, by = c("src_subject_id", "eventname"))
+  mutate(y, age_yrs = interview_age/12)
+  return(y)
+})
+
+y2dat_y = merge(envRS, mddy$y2, by = "src_subject_id")
+y2prs_y = merge(scores, mddy$y2, by = "src_subject_id")
 ```
 
-For depRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+For depRS-only analyses, there are `r nrow(filter(y2dat_y, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat_y, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat_y, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
 \
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_y)`), there are `r nrow(filter(y2prs_y, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs_y, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_y, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
 \
 
 ### depRS only
 
 ```{r}
-depmod = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+depmod = glm(mdd_lifetime ~ depRS_b, y2dat_y, family = binomial(link = "logit"))
 sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
 
 performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
+
+roc(y2dat_y$mdd_lifetime, depmod$fitted.values)
 ```
 
 
 ### Performance metrics
 
 ```{r}
-m1 = glm(mdd_lifetime ~ depRS_b, y2prs, family = binomial(link = "logit"))
-m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs, family = binomial(link = "logit"))
+m1 = glm(mdd_lifetime ~ depRS_b, y2prs_y, family = binomial(link = "logit"))
+m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs_y, family = binomial(link = "logit"))
+m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs_y, family = binomial(link = "logit"))
 
 mods = list(m1, m2, m3)
 
@@ -194,47 +222,60 @@ kable(accs, digits = 3) |> kable_styling()
 
 ```{r}
 #ROC curves for each model
-roc_depRS = roc(y2dat$mdd_lifetime, depmod$fitted.values)
-# roc_m1 = roc(y2prs$mdd_lifetime, m1$fitted.values) same as depression only, but much fewer data points
-roc_m2 = roc(y2prs$mdd_lifetime, m2$fitted.values)
-roc_m3 = roc(y2prs$mdd_lifetime, m3$fitted.values)
+roc_m1 = roc(y2prs_y$mdd_lifetime, m1$fitted.values) 
+roc_m2 = roc(y2prs_y$mdd_lifetime, m2$fitted.values)
+roc_m3 = roc(y2prs_y$mdd_lifetime, m3$fitted.values)
 
-ggroc(list("depRS" = roc_depRS, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
+ggroc(list("depRS" = roc_m1, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
   scale_color_manual(values = pal) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dotted") +
   theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
 ```
 
+### Data description
+
+```{r}
+y2prs_y |> select(age_yrs, mdd_lifetime, depRS_b) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
 
 ## (d) 2-year lifetime MDD diagnosis (parent) {.tabset}
 
 ```{r}
 mddp = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_p.rds")
-y2dat = merge(envRS, mddp$y2, by = "src_subject_id")
-y2prs = merge(scores, mddp$y2, by = "src_subject_id")
+
+mddp = lapply(mddp, function(x) {
+  y = merge(x, lt, by = c("src_subject_id", "eventname"))
+  mutate(y, age_yrs = interview_age/12)
+  return(y)
+})
+
+y2dat_p = merge(envRS, mddp$y2, by = "src_subject_id")
+y2prs_p = merge(scores, mddp$y2, by = "src_subject_id")
 ```
 
-For depRS-only analyses, there are `r nrow(filter(y2dat, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+For depRS-only analyses, there are `r nrow(filter(y2dat_p, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat_p, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat_p, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
 \
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs)`), there are `r nrow(filter(y2prs, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_p)`), there are `r nrow(filter(y2prs_p, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs_p, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_p, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
 \
 
 ### depRS only
 
 ```{r}
-depmod = glm(mdd_lifetime ~ depRS_b, y2dat, family = binomial(link = "logit"))
+depmod = glm(mdd_lifetime ~ depRS_b, y2dat_p, family = binomial(link = "logit"))
 sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
 
 performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
+
+roc_depRS = roc(y2dat_p$mdd_lifetime, depmod$fitted.values)
 ```
 
 ### Performance metrics
 
 ```{r}
-m1 = glm(mdd_lifetime ~ depRS_b, y2prs, family = binomial(link = "logit"))
-m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs, family = binomial(link = "logit"))
+m1 = glm(mdd_lifetime ~ depRS_b, y2prs_p, family = binomial(link = "logit"))
+m2 = glm(mdd_lifetime ~ depRS_b + PRS, y2prs_p, family = binomial(link = "logit"))
+m3 = glm(mdd_lifetime ~ depRS_b*PRS, y2prs_p, family = binomial(link = "logit"))
 
 mods = list(m1, m2, m3)
 
@@ -261,16 +302,21 @@ kable(accs, digits = 3) |> kable_styling()
 
 ```{r}
 #ROC curves for each model
-roc_depRS = roc(y2dat$mdd_lifetime, depmod$fitted.values)
-# roc_m1 = roc(y2prs$mdd_lifetime, m1$fitted.values) same as depression only, but much fewer data points
-roc_m2 = roc(y2prs$mdd_lifetime, m2$fitted.values)
-roc_m3 = roc(y2prs$mdd_lifetime, m3$fitted.values)
+roc_m1 = roc(y2prs_p$mdd_lifetime, m1$fitted.values)
+roc_m2 = roc(y2prs_p$mdd_lifetime, m2$fitted.values)
+roc_m3 = roc(y2prs_p$mdd_lifetime, m3$fitted.values)
 
-ggroc(list("depRS" = roc_depRS, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
+ggroc(list("depRS" = roc_m1, "depRS + PRS" = roc_m2, "depRS*PRS" = roc_m3)) +
   scale_color_manual(values = pal) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dotted") +
   theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
+```
+
+### Data description
+
+```{r}
+y2prs_p |> select(age_yrs, mdd_lifetime, depRS_b) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 # Year 2 depRS
@@ -328,6 +374,12 @@ accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
 ```
 
+### Data description
+
+```{r}
+y3_dat |> select(age_yrs, dep, depRS_y2) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
 
 ## Y4 CBCL Depression {.tabset}
 
@@ -369,4 +421,10 @@ sjPlot::tab_model(mods, dv.labels = c("m1", "m2", "m3"), collapse.ci = T, show.s
 accs = lapply(mods, performance_accuracy) 
 accs = lapply(accs, as.data.frame) |> bind_rows(.id = "model")
 kable(accs, digits = 3) |> kable_styling()
+```
+
+### Data description
+
+```{r}
+y4_dat |> select(age_yrs, dep, depRS_y2) |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```

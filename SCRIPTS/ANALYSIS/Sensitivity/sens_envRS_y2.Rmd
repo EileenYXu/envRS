@@ -1,5 +1,6 @@
 ---
 title: "ABCDv5.1 Y2 sensitivity"
+date: "`r Sys.Date()`"
 output:
   html_document:
     code_folding: hide
@@ -18,6 +19,8 @@ library(RColorBrewer)
 library(glmnet)
 library(kableExtra)
 set.seed(2024)
+
+pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 ```
 
 
@@ -30,7 +33,10 @@ test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_t
 
 trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
+```
 
+
+```{r}
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
@@ -62,40 +68,53 @@ Training sample `r nrow(train)`, test sample `r nrow(test)`.
 
 # CBCL DSM5-oriented depression subscale {.tabset}
 
-## Lambda plot
+## Cross-validation
 
 ```{r}
-depfit = cv.glmnet(x = preds, y = dep, nfolds = 10, type.measure = "deviance")
-plot(depfit)
+## assign each observation to a fold so that I can cross-validate alpha
+foldid = sample(1:10, size = length(dep), replace = TRUE)
+alphas = seq(0, 1, by = 0.1)
+
+## use for loop to cross-validate alphas
+depfits = list()
+for(i in 1:length(alphas)) {
+  depfits[[paste0("alpha_", alphas[i])]] = cv.glmnet(x = preds, y = dep, foldid = foldid, type.measure = "deviance", alpha = alphas[i])
+}
+
+## use for loop to get fit statistics for each alpha value in training data
+trainfits = list()
+for (i in 1:length(depfits)) {
+  trainfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = preds, newy = dep, s = "lambda.min")
+}
+
+## same thing for test data
+testfits = list()
+for (i in 1:length(depfits)) {
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+}
+
+## extract MSE for training and test data and print this as a table
+train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
+test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
+
+data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
+
+## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
+plot(log(depfits[[1]]$lambda), depfits[[1]]$cvm, col = pal[1], type = "l",
+     xlab = "log(Lambda)", ylab = "Mean cross-validated error")
+for (i in 2:length(depfits)) {
+  lines(log(depfits[[i]]$lambda), depfits[[i]]$cvm, col = pal[i])
+}
+legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
 ```
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
 
 ```{r results='hide'}
-depfit_coef = coef(depfit, s = "lambda.1se") |> as.matrix()
-depfit_min = coef(depfit, s = "lambda.min") |> as.matrix()
-
-coef_dep = data.frame(
-  preds = rownames(depfit_coef),
-  beta.min = depfit_min[,1],
-  beta.1se = depfit_coef[,1],
-  out = rep("CBCL_depression", nrow(depfit_coef)),
-  row.names = NULL
-)
-```
-
-## Fit statistics
-
-```{r}
-train_min = assess.glmnet(depfit, newx = preds, newy = dep, s = "lambda.min")
-train_1se = assess.glmnet(depfit, newx = preds, newy = dep, s = "lambda.1se")
-test_min = assess.glmnet(depfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
-test_1se = assess.glmnet(depfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
-
-data.frame(Sample = c("training", "training", "test", "test"),
-           Lambda = c("min", "1se", "min", "1se"),
-           MSE = c(train_min$mse, train_1se$mse, test_min$mse, test_1se$mse),
-           RMSE = c(sqrt(train_min$mse), sqrt(train_1se$mse), sqrt(test_min$mse), sqrt(test_1se$mse)),
-           MAE = c(train_min$mae, train_1se$mae, test_min$mae, test_1se$mae)) |> 
-  kbl(digits = 3) |> kable_styling() |> scroll_box(height = "300px")
+depcoef = coef(depfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
+names(depcoef)[2] = "depRS"
 ```
 
 ## Plot predictions
@@ -104,69 +123,76 @@ data.frame(Sample = c("training", "training", "test", "test"),
 depRS_train = data.frame(
   src_subject_id = trainIDs,
   cbcl_dep = dep,
-  depRS.min = predict(depfit, newx = preds, s = "lambda.min"),
-  depRS.1se = predict(depfit, newx = preds, s = "lambda.1se"),
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = preds, s = "lambda.min"),
   data = rep("train", times= length(dep))
 )
 
 depRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_dep = test$cbcl_dsm5_depress,
-  depRS.min = predict(depfit, newx = testpreds, s = "lambda.min"),
-  depRS.1se = predict(depfit, newx = testpreds, s = "lambda.1se"),
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
 depRS = rbind(depRS_train, depRS_test)
-
-depRS_dat = rbind(depRS_test, depRS_train) |> 
-  pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
 ```
 
 ```{r}
-ggplot(depRS_dat, aes(y = cbcl_dep, x = predicted, colour = lambda)) +
+ggplot(depRS, aes(y = cbcl_dep, x = lambda.min, colour = data)) +
   geom_smooth() +
   theme_bw() +
-  facet_wrap(~data) +
-  labs(x = "predicted depRS", y = "CBCL depression /n (scaled and centred)")
+  labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
 ```
 
 # CBCL internalising subscale {.tabset}
 
-## Lambda plot
+## Cross-validation
 
 ```{r}
-intfit = cv.glmnet(x = preds, y = int, nfolds = 10)
-plot(intfit)
+## assign each observation to a fold so that I can cross-validate alpha
+foldid = sample(1:10, size = length(int), replace = TRUE)
+alphas = seq(0, 1, by = 0.1)
+
+## use for loop to cross-validate alphas
+intfits = list()
+for(i in 1:length(alphas)) {
+  intfits[[paste0("alpha_", alphas[i])]] = cv.glmnet(x = preds, y = int, foldid = foldid, type.measure = "deviance", alpha = alphas[i])
+}
+
+## use for loop to get fit statistics for each alpha value in training data
+trainfits = list()
+for (i in 1:length(intfits)) {
+  trainfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = preds, newy = int, s = "lambda.min")
+}
+
+## same thing for test data
+testfits = list()
+for (i in 1:length(intfits)) {
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = testpreds, newy = test$cbcl_internalising, s = "lambda.min")
+}
+
+## extract MSE for training and test data and print this as a table
+train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
+test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
+
+data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
+
+## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
+plot(log(intfits[[1]]$lambda), intfits[[1]]$cvm, col = pal[1], type = "l",
+     xlab = "log(Lambda)", ylab = "Mean cross-validated error")
+for (i in 2:length(intfits)) {
+  lines(log(intfits[[i]]$lambda), intfits[[i]]$cvm, col = pal[i])
+}
+legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
 ```
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
 
 ```{r results='hide'}
-intfit_coef = coef(intfit, s = "lambda.1se") |> as.matrix()
-intfit_min = coef(intfit, s = "lambda.min") |> as.matrix()
-
-coef_int = data.frame(
-  preds = rownames(intfit_coef),
-  beta.min = intfit_min[,1],
-  beta.1se = intfit_coef[,1],
-  out = rep("CBCL_internalising", nrow(intfit_coef)),
-  row.names = NULL
-)
-```
-
-## Fit statistics
-
-```{r}
-train_min = assess.glmnet(intfit, newx = preds, newy = int, s = "lambda.min")
-train_1se = assess.glmnet(intfit, newx = preds, newy = int, s = "lambda.1se")
-test_min = assess.glmnet(intfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
-test_1se = assess.glmnet(intfit, newx = testpreds, newy = test$cbcl_dsm5_depress, s="lambda.min")
-
-data.frame(Sample = c("training", "training", "test", "test"),
-           Lambda = c("min", "1se", "min", "1se"),
-           MSE = c(train_min$mse, train_1se$mse, test_min$mse, test_1se$mse),
-           RMSE = c(sqrt(train_min$mse), sqrt(train_1se$mse), sqrt(test_min$mse), sqrt(test_1se$mse)),
-           MAE = c(train_min$mae, train_1se$mae, test_min$mae, test_1se$mae)) |> 
-  kbl(digits = 3) |> kable_styling() |> scroll_box(height = "300px")
+intcoef = coef(intfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame()|> rownames_to_column(var = "preds")
+names(intcoef)[2] = "intRS"
 ```
 
 ## Plot predictions
@@ -175,109 +201,43 @@ data.frame(Sample = c("training", "training", "test", "test"),
 intRS_train = data.frame(
   src_subject_id = trainIDs,
   cbcl_int = int,
-  intRS.min = predict(intfit, newx = preds, s = "lambda.min"),
-  intRS.1se = predict(intfit, newx = preds, s = "lambda.1se"),
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = preds, s = "lambda.min"),
   data = rep("train", times= length(int))
 )
 
 intRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_int = test$cbcl_internalising,
-  intRS.min = predict(intfit, newx = testpreds, s = "lambda.min"),
-  intRS.1se = predict(intfit, newx = testpreds, s = "lambda.1se"),
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
 intRS = rbind(intRS_train, intRS_test)
-envRS = merge(depRS, intRS, by = "src_subject_id")
-
-saveRDS(envRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_y2_sens.rds")
-
-intRS_dat = rbind(intRS_test, intRS_train) |> 
-  pivot_longer(cols = c("lambda.min", "lambda.1se"), names_to = "lambda", values_to = "predicted")
 ```
- 
+
 ```{r}
-ggplot(intRS_dat, aes(y = cbcl_int, x = predicted, colour = lambda)) +
+ggplot(intRS, aes(y = cbcl_int, x = lambda.min, colour = data)) +
   geom_smooth() +
   theme_bw() +
-  facet_wrap(~data) +
   labs(x = "predicted intRS", y = "CBCL internalising (scaled and centred)")
 ```
 
-# Non-zero coefficients 
-
-beta.min = coefficients for lambda value that produces minimum mean cross-validated error. 
-beta.1se = coefficients for lambda value that produces the most regularized model while keeping the cross-validated error within one standard error of the minimum.
+# Non-zero coefficients {.tabset}
 
 ```{r}
-data.frame(predictor = coef_int[,1],
-           dep_beta.min = coef_dep[,2],
-           dep_beta.1se = coef_dep[,3],
-           int_beta.min = coef_int[,2],
-           int_beta.1se = coef_int[,3]) |> 
-  kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
-```
-
-## beta.min {.tabset}
-
-```{r}
-y2_coefs = rbind(coef_int[-1,], coef_dep[-1,])
+y2_coefs = merge(depcoef, intcoef)
 
 write.csv(y2_coefs, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/y2_coefs_sens.csv")
-
-y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.min, 3))!=0)
 ```
 
-### CBCL depression
+## CBCL depression
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+depcoef[order(depcoef$depRS, decreasing = T),] |> filter(abs(depRS)!=0) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
 
-### CBCL internalising
+## CBCL internalising
 
 ```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
+intcoef[order(intcoef$intRS, decreasing = T),] |> filter(abs(intRS)!=0) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
 ```
-
-
-```{r fig.width=10, fig.height=15}
-ggplot(y2_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
-  geom_tile(color = "white", lwd = 1, linetype = 1) +
-  geom_text(aes(label = round(beta.min, 3)), color = "black", size = 12, size.unit = "pt") +
-  scale_fill_gradient2(name = "Standardised \n Beta", low = "#2166AC", high = "#B2182B") +
-  xlab(NULL) + ylab(NULL) +
-  theme(panel.grid = element_blank(), panel.background = element_blank(), 
-        axis.text = element_text(size = 12), legend.title = element_text(size=12))
-```
-
-## beta.1se {.tabset}
-
-```{r}
-y2_coefs_sig = y2_coefs %>% filter(abs(round(beta.1se, 3))!=0)
-```
-
-### CBCL depression
-
-```{r}
-y2_coefs_sig |> filter(out=="CBCL_depression") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
-```
-
-### CBCL internalising
-
-```{r}
-y2_coefs_sig |> filter(out=="CBCL_internalising") |> arrange(desc(beta.min)) |> kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
-```
-
-
-```{r fig.width=10, fig.height=5}
-ggplot(y2_coefs_sig, aes(x = out, y = preds, fill = beta.1se)) +
-  geom_tile(color = "white", lwd = 1, linetype = 1) +
-  geom_text(aes(label = round(beta.1se, 3)), color = "black", size = 12, size.unit = "pt") +
-  scale_fill_gradient2(name = "Standardised \n Beta", low = "#2166AC", high = "#B2182B") +
-  xlab(NULL) + ylab(NULL) +
-  theme(panel.grid = element_blank(), panel.background = element_blank(), 
-        axis.text = element_text(size = 12), legend.title = element_text(size=12))
-```
- 
