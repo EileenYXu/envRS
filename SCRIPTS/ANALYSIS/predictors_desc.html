@@ -11,7 +11,7 @@
 
 <meta name="author" content="Eileen Xu" />
 
-<meta name="date" content="2024-12-17" />
+<meta name="date" content="2025-01-14" />
 
 <title>Data descriptions all sweeps</title>
 
@@ -576,7 +576,7 @@ display: none;
 
 <h1 class="title toc-ignore">Data descriptions all sweeps</h1>
 <h4 class="author">Eileen Xu</h4>
-<h4 class="date">2024-12-17</h4>
+<h4 class="date">2025-01-14</h4>
 
 </div>
 
@@ -605,13 +605,13 @@ names(dat)</code></pre>
 ## [37] &quot;video_game_add&quot;             &quot;bullying_victim&quot;           
 ## [39] &quot;cybb_phenx_harm&quot;            &quot;mctq_msfsc_calc&quot;           
 ## [41] &quot;ple_p_ss_total_number&quot;      &quot;fes_y_ss_fc_pr&quot;            
-## [43] &quot;pmq_y_ss_mean&quot;              &quot;eatq_p_ss_effort_cont_ss&quot;  
-## [45] &quot;asr_scr_depress_r&quot;          &quot;site_id_l&quot;                 
-## [47] &quot;rel_family_id&quot;              &quot;rel_birth_id&quot;              
-## [49] &quot;school_id&quot;                  &quot;district_id&quot;               
-## [51] &quot;interview_date&quot;             &quot;interview_age&quot;             
-## [53] &quot;visit_type&quot;                 &quot;cbcl_scr_syn_internal_r&quot;   
-## [55] &quot;cbcl_scr_dsm5_depress_r&quot;</code></pre>
+## [43] &quot;pmq_y_ss_mean&quot;              &quot;crpbi_y_ss_parent&quot;         
+## [45] &quot;eatq_p_ss_effort_cont_ss&quot;   &quot;asr_scr_depress_r&quot;         
+## [47] &quot;site_id_l&quot;                  &quot;rel_family_id&quot;             
+## [49] &quot;rel_birth_id&quot;               &quot;school_id&quot;                 
+## [51] &quot;district_id&quot;                &quot;interview_date&quot;            
+## [53] &quot;interview_age&quot;              &quot;visit_type&quot;                
+## [55] &quot;cbcl_scr_syn_internal_r&quot;    &quot;cbcl_scr_dsm5_depress_r&quot;</code></pre>
 <pre class="r"><code>preds = dat |&gt; select(-src_subject_id, -site_id_l, -rel_family_id, -rel_birth_id,
                       -school_id, -district_id, -interview_date, -interview_age,
                       -visit_type, -cbcl_scr_syn_internal_r, -cbcl_scr_dsm5_depress_r)</code></pre>
@@ -1085,6 +1085,17 @@ pmq_y_ss_mean
 </td>
 <td style="text-align:left;">
 25
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+crpbi_y_ss_parent
+</td>
+<td style="text-align:left;">
+28
+</td>
+<td style="text-align:left;">
+8977
 </td>
 </tr>
 <tr>
@@ -1952,6 +1963,26 @@ pmq_y_ss_mean
 </td>
 <td style="text-align:left;">
 0.0004815796
+</td>
+<td style="text-align:left;">
+0.0010506961
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+crpbi_y_ss_parent
+</td>
+<td style="text-align:left;">
+0.0028565599
+</td>
+<td style="text-align:left;">
+0.0007591368
+</td>
+<td style="text-align:left;">
+1.0000000000
+</td>
+<td style="text-align:left;">
+0.0003611847
 </td>
 <td style="text-align:left;">
 0.0010506961

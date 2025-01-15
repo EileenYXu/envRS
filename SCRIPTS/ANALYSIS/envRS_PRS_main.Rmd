@@ -48,9 +48,12 @@ cbcl_y4 = cbcl |> filter(eventname=="4_year_follow_up_y_arm_1") |>
 ```{r scores}
 PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS) |> mutate(across(where(is.numeric), scale))
 
-envRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_baseline.rds")
-names(envRS) = c("src_subject_id", "cbcl_dep_b", "depRS_b", "depRS_1se", "data", "cbcl_int_b", "intRS_b", "intRS_1se", "data.y")
-envRS = envRS |> select(src_subject_id, depRS_b, intRS_b) |> mutate(across(where(is.numeric), scale))
+depRS_b = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_baseline.rds") |> select(src_subject_id, lambda.min)
+names(depRS_b) = c("src_subject_id", "depRS_b")
+intRS_b = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_baseline.rds") |> select(src_subject_id, lambda.min)
+names(intRS_b) = c("src_subject_id", "intRS_b")
+
+envRS = merge(depRS_b, intRS_b, by = "src_subject_id") |> mutate(across(where(is.numeric), scale))
 
 scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
 ```
@@ -173,21 +176,10 @@ y2dat_y = merge(envRS, mddy$y2, by = "src_subject_id")
 y2prs_y = merge(scores, mddy$y2, by = "src_subject_id")
 ```
 
-For depRS-only analyses, there are `r nrow(filter(y2dat_y, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat_y, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat_y, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_y)`), there are `r nrow(filter(y2prs_y, mdd_lifetime==1))` lifetime MDD cases. \
 \
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_y)`), there are `r nrow(filter(y2prs_y, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs_y, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_y, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
-\
-
-### depRS only
-
-```{r}
-depmod = glm(mdd_lifetime ~ depRS_b, y2dat_y, family = binomial(link = "logit"))
-sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
-
-performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
-
-roc(y2dat_y$mdd_lifetime, depmod$fitted.values)
-```
+`r nrow(filter(y2prs_y, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_y, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). 
 
 
 ### Performance metrics
@@ -254,21 +246,10 @@ y2dat_p = merge(envRS, mddp$y2, by = "src_subject_id")
 y2prs_p = merge(scores, mddp$y2, by = "src_subject_id")
 ```
 
-For depRS-only analyses, there are `r nrow(filter(y2dat_p, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2dat_p, mdd_present==1))` current MDD cases and `r nrow(filter(y2dat_p, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_p)`), there are `r nrow(filter(y2prs_p, mdd_lifetime==1))` lifetime MDD cases. \
 \
-Of those with both envRS and PRS at Y2 (N = `r nrow(y2prs_p)`), there are `r nrow(filter(y2prs_p, mdd_lifetime==1))` lifetime MDD cases, `r nrow(filter(y2prs_p, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_p, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified). \
+`r nrow(filter(y2prs_p, mdd_present==1))` current MDD cases and `r nrow(filter(y2prs_p, any_lifetime==1))` cases with lifetime diagnoses of a depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified).
 \
-
-### depRS only
-
-```{r}
-depmod = glm(mdd_lifetime ~ depRS_b, y2dat_p, family = binomial(link = "logit"))
-sjPlot::tab_model(depmod, collapse.ci = T, show.se = T, show.stat = T)
-
-performance_accuracy(depmod)|> as.data.frame() |> kable(digits = 3) |> kable_styling()
-
-roc_depRS = roc(y2dat_p$mdd_lifetime, depmod$fitted.values)
-```
 
 ### Performance metrics
 
@@ -326,9 +307,12 @@ y2prs_p |> select(age_yrs, mdd_lifetime, depRS_b) |> dfSummary(plain.ascii = F, 
 using year 2 envRS scores.
 
 ```{r}
-envRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/envRS_y2.rds")
-names(envRS) = c("src_subject_id", "cbcl_dep_y2", "depRS_y2", "depRS_1se", "data", "cbcl_int_y2", "intRS_y2", "intRS_1se", "data.y")
-envRS = envRS |> select(src_subject_id, cbcl_dep_y2, cbcl_int_y2, depRS_y2, intRS_y2)
+depRS_y2 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_y2.rds") |> select(src_subject_id, lambda.min)
+names(depRS_y2) = c("src_subject_id", "depRS_y2")
+intRS_y2 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_y2.rds") |> select(src_subject_id, lambda.min)
+names(intRS_y2) = c("src_subject_id", "intRS_y2")
+
+envRS = merge(depRS_y2, intRS_y2, by = "src_subject_id") |> mutate(across(where(is.numeric), scale))
 ```
 
 ```{r}

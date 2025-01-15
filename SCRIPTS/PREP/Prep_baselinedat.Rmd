@@ -47,8 +47,8 @@ names(baseline) = c("src_subject_id", "tobacco_puff", "weightcontrol_ksads",
                     "serious_accident", "sleep_hrs", "bmi", "needed_food",
                     "income", "parent_ed", "birthsex", "gender",
                     "race_ethnicity","area_depriv", "comm_safety",
-                    "days_active", "fam_conflict", "p_monitoring", "p_depression",
-                    "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
+                    "days_active", "fam_conflict", "p_monitoring", "p_acceptance",
+                    "p_depression", "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
 
 # remove empty levels
 baseline = droplevels(baseline)
@@ -65,7 +65,7 @@ Little's MCAR test for continuous variables:
 baseline |> select_if(~ is.numeric(.)) |> naniar::mcar_test() |> kbl() |> kable_styling()
 ```
 
-I plan on keeping the (5-level) ethnicity variable in for mice imputation, but will remove it from the final model. I think that I should prioritise analysis in the complete sample though? The imputed missing data is influenced by the other variables in the data (and thus entered into the model) and when it comes to longitudinal analysis it might make things overly complicated. But it's useful to keep the mice code here anyway for now at least, though it might get removed later.
+I had the (5-level) ethnicity variable in for mice imputation, but the imputed missing data is influenced by the other variables in the data (and thus entered into the model) and when it comes to longitudinal analysis it might make things overly complicated. Doing complete sample analysis instead.
 
 ```{r}
 ## split into train and test samples ##

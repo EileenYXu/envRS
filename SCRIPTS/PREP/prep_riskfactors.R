@@ -218,6 +218,12 @@ monitor = monitor |> select(src_subject_id, eventname, pmq_y_ss_mean)
 
 summary(monitor)
 
+#### crpbi - relationship w parent ####
+crpbi = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_crpbi.csv")
+crpbi = crpbi |> select(src_subject_id, eventname, crpbi_y_ss_parent)
+
+summary(crpbi)
+
 #### effortful control ####
 eff_control = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_eatq.csv")
 eff_control = eff_control |> select(src_subject_id, eventname, eatq_p_ss_effort_cont_ss)
@@ -231,14 +237,14 @@ asr = asr |> select(src_subject_id, eventname, asr_scr_depress_r)
 summary(asr)
 
 #### construct full dataset ####
-dfs = list(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, eff_control, asr)
+dfs = list(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, crpbi, eff_control, asr)
 
 dat = purrr::reduce(.x=dfs, merge, by = c("src_subject_id", "eventname"), all = T)
 
 # fill reshist_addr1_adi_perc for all eventnames with baseline values for src_subject_id
 dat = dat |> group_by(src_subject_id) |> fill(reshist_addr1_adi_perc, .direction = "updown") |> ungroup()
 
-rm(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, eff_control, asr)
+rm(subs_use, ksads, bkfs, erq, sleep, bmi, demog, depriv, commsafety, discrim, activity, screentime, bully, cyber, chron, ple, conflict, monitor, crpbi, eff_control, asr)
 
 #### add family ID ####
 rel_id = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_y_lt.csv")

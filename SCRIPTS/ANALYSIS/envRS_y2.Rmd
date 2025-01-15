@@ -32,30 +32,23 @@ testIDs = test$src_subject_id
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
+train$bullying_gender = train$bullying_victim * as.numeric(train$gender)
+
 test = test |> mutate_at(numcols, ~ c(scale(.)) )
+test$bullying_gender = test$bullying_victim * as.numeric(test$gender)
 
-## remove columns that are not used for training data and make interactions
-x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
-
-x_interact = x[,-grep("gender", colnames(x))] * as.numeric(train$gender)
-colnames(x_interact) = paste0(colnames(x_interact), "_gender")
+## remove columns that are not used for training data
+preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
 
 ## remove columns not used in test data and make interactions
-test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
+test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
 
-test_pred_interact = test_pred[,-grep("gender", colnames(test_pred))] * as.numeric(test$gender)
-colnames(test_pred_interact) = paste0(colnames(test_pred_interact), "_gender")
-
-## data for glm
-preds = cbind(x, x_interact)
+## outcomes for glm
 dep = train$cbcl_dsm5_depress
 int = train$cbcl_internalising
-
-testpreds = cbind(test_pred, test_pred_interact)
-rm(x_interact, test_pred, test_pred_interact, numcols)
 ```
 
-80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. `r ncol(x)` predictors were included, plus gender interactions, yielding `r ncol(preds)` predictors in total.
+80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. `r ncol(preds)` predictors were included, including an interaction between bullying and gender.
 
 # CBCL DSM5-oriented depression subscale {.tabset}
 
@@ -81,7 +74,7 @@ for (i in 1:length(depfits)) {
 ## same thing for test data
 testfits = list()
 for (i in 1:length(depfits)) {
-  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = test_preds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
 }
 
 ## extract MSE for training and test data and print this as a table
@@ -121,11 +114,13 @@ depRS_train = data.frame(
 depRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_dep = test$cbcl_dsm5_depress,
-  depRS.min = predict(depfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = test_preds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
 depRS = rbind(depRS_train, depRS_test)
+
+saveRDS(depRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_y2.rds")
 ```
 
 ```{r}
@@ -159,7 +154,7 @@ for (i in 1:length(intfits)) {
 ## same thing for test data
 testfits = list()
 for (i in 1:length(intfits)) {
-  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = testpreds, newy = test$cbcl_internalising, s = "lambda.min")
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = test_preds, newy = test$cbcl_internalising, s = "lambda.min")
 }
 
 ## extract MSE for training and test data and print this as a table
@@ -199,11 +194,13 @@ intRS_train = data.frame(
 intRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_int = test$cbcl_internalising,
-  intRS.min = predict(intfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = test_preds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
 intRS = rbind(intRS_train, intRS_test)
+
+saveRDS(intRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_y2.rds")
 ```
 
 ```{r}

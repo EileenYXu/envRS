@@ -40,28 +40,20 @@ testIDs = test$src_subject_id
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
+train$bullying_sex = train$bullying_victim * as.numeric(train$birthsex)
+
 test = test |> mutate_at(numcols, ~ c(scale(.)) )
+test$bullying_sex = test$bullying_victim * as.numeric(test$birthsex)
 
 ## remove columns that are not used for training data
-x = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
-
-## make interactions
-x_interact = x[,-grep("birthsex", colnames(x))] * as.numeric(train$birthsex)
-colnames(x_interact) = paste0(colnames(x_interact), "_sex")
+preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
 
 ## same for test data
-test_pred = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
-
-test_pred_interact = test_pred[,-grep("birthsex", colnames(test_pred))] * as.numeric(test$birthsex)
-colnames(test_pred_interact) = paste0(colnames(test_pred_interact), "_sex")
+test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
 
 ## data for model
-preds = cbind(x, x_interact)
 dep = train$cbcl_dsm5_depress
 int = train$cbcl_internalising
-
-testpreds = cbind(test_pred, test_pred_interact)
-rm(x, x_interact, test_pred, test_pred_interact, numcols)
 ```
 
 Training sample `r nrow(train)`, test sample `r nrow(test)`.
@@ -90,7 +82,7 @@ for (i in 1:length(depfits)) {
 ## same thing for test data
 testfits = list()
 for (i in 1:length(depfits)) {
-  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = testpreds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(depfits[[i]], newx = test_preds, newy = test$cbcl_dsm5_depress, s = "lambda.min")
 }
 
 ## extract MSE for training and test data and print this as a table
@@ -130,7 +122,7 @@ depRS_train = data.frame(
 depRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_dep = test$cbcl_dsm5_depress,
-  depRS.min = predict(depfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  depRS.min = predict(depfits[[which.min(train_mse)]], newx = test_preds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
@@ -168,7 +160,7 @@ for (i in 1:length(intfits)) {
 ## same thing for test data
 testfits = list()
 for (i in 1:length(intfits)) {
-  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = testpreds, newy = test$cbcl_internalising, s = "lambda.min")
+  testfits[[paste0("alpha_", alphas[i])]] = assess.glmnet(intfits[[i]], newx = test_preds, newy = test$cbcl_internalising, s = "lambda.min")
 }
 
 ## extract MSE for training and test data and print this as a table
@@ -208,7 +200,7 @@ intRS_train = data.frame(
 intRS_test = data.frame(
   src_subject_id = testIDs,
   cbcl_int = test$cbcl_internalising,
-  intRS.min = predict(intfits[[which.min(train_mse)]], newx = testpreds, s = "lambda.min"),
+  intRS.min = predict(intfits[[which.min(train_mse)]], newx = test_preds, s = "lambda.min"),
   data = rep("test", times = nrow(test))
 )
 
@@ -227,7 +219,7 @@ ggplot(intRS, aes(y = cbcl_int, x = lambda.min, colour = data)) +
 ```{r}
 y2_coefs = merge(depcoef, intcoef)
 
-write.csv(y2_coefs, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/y2_coefs_sens.csv")
+write.csv(y2_coefs, "C://users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/y2_coefs_sens.csv")
 ```
 
 ## CBCL depression
