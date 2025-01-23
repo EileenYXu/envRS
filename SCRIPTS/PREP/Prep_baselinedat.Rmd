@@ -39,13 +39,13 @@ Note on the "gender" variable: this is coded based on child's (parent-) reported
 ## remove any variables with >20% missing data?
 baseline = baseline |> select_if(~ sum(is.na(.))<0.2*nrow(baseline))
 
-baseline = baseline %>% select(-c(eventname, illicit, site_id_l, rel_family_id, rel_birth_id, interview_date, visit_type, gender_id))
+baseline = baseline %>% select(-c(eventname, illicit, site_id_l, rel_family_id, rel_birth_id, interview_date, visit_type))
 
 names(baseline) = c("src_subject_id", "tobacco_puff", "weightcontrol_ksads",
                     "witness_comm_violence", "death_loved_one",
                     "witness_dv", "s_abuse", "p_abuse", "emot_abuse",
                     "serious_accident", "sleep_hrs", "bmi", "needed_food",
-                    "income", "parent_ed", "birthsex", "gender",
+                    "income", "parent_ed", "birthsex", "gender_id", "gender",
                     "race_ethnicity","area_depriv", "comm_safety",
                     "days_active", "fam_conflict", "p_monitoring", "p_acceptance",
                     "p_depression", "agemths", "cbcl_internalising", "cbcl_dsm5_depress")
@@ -80,19 +80,19 @@ testdat = baseline[index,]
 ### Full sample
 
 ```{r}
-baseline[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+baseline[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
 ```
 
 ### Training data:
 
 ```{r}
-traindat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+traindat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
 ```
 
 ### Test data:
 
 ```{r}
-testdat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+testdat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
 ```
 
 

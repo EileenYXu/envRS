@@ -108,13 +108,13 @@ bmi = bmi |> filter(biv=="plausible") |> select(src_subject_id, eventname, bmi)
 
 #### demogs ####
 demog = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_p_demo.csv")
-demog = demog |> select(src_subject_id, eventname, demo_gender_id_v2, demo_sex_v2,
+demog = demog |> select(src_subject_id, eventname, demo_gender_id_v2, demo_gender_id_v2_l, demo_sex_v2,
                          demo_fam_exp1_v2, demo_fam_exp1_v2_l,
                          demo_comb_income_v2, demo_comb_income_v2_l,
                          demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l, demo_prnt_ed_v2_l,
                          race_ethnicity)
 
-demog = demog |> group_by(src_subject_id) |> fill(demo_sex_v2) |> fill(demo_gender_id_v2) |> fill(race_ethnicity)
+demog = demog |> group_by(src_subject_id) |> fill(demo_sex_v2) |> fill(race_ethnicity)
 demog = ungroup(demog)
 
 demog = demog |> mutate(across(where(is.numeric), ~na_if(.,777)),
@@ -133,11 +133,12 @@ demog = demog |> mutate(across(where(is.numeric), ~na_if(.,777)),
                          birthsex = factor(demo_sex_v2, levels = c("1","2", "3"), 
                                            labels =c("M", "F", "Intersex")),
                          
-                         gender_id = factor(demo_gender_id_v2, levels = c(1,2,3,4,5,6), 
-                                            labels = c("Mcis", "Fcis", "Mtrans", "Ftrans", 
+                         gender_id = coalesce(demo_gender_id_v2, demo_gender_id_v2_l) |>  
+                          factor(levels = c(1,2,3,4,5,6), labels = c("Mcis", "Fcis", "Mtrans", "Ftrans", 
                                                        "GNC", "Diff")),
                          
                          gender = coalesce(gender_id, birthsex) |> as.factor(),
+                        
                          race_ethnicity = factor(race_ethnicity, levels = c(1, 2, 3, 4, 5),
                                                  labels = c("White", "Black", "Hispanic", 
                                                             "Asian", "Other")))

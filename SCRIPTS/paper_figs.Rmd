@@ -1,0 +1,73 @@
+---
+title: "Figs"
+author: "Eileen Xu"
+date: "2025-01-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+base_coef = read.csv("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Results/base_coefs.csv")
+y2_coef = read.csv("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Results/y2_coefs.csv")
+
+dep = merge(base_coef[,2:3], y2_coef[,2:3], by = "preds", all = T)[-1,]
+names(dep) = c("pred", "base", "y2")
+```
+
+```{r}
+dep |> arrange(desc(abs(base))) |> head()
+dep |> arrange(desc(abs(y2))) |> head()
+
+coef0.1 = dep |> filter(abs(base)>=0.1|abs(y2)>=0.1) |> arrange(pred)
+```
+
+```{r}
+plt = pivot_longer(coef0.1, cols = c("base", "y2"), names_to = "data", 
+             values_to = "coefs") |> 
+  ggplot(aes(x = data, y = fct_rev(pred), fill = coefs, label = round(coefs, 2))) +
+  
+  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  
+  geom_text(aes(color = after_scale(
+    prismatic::best_contrast(fill, c("white", "black"))
+  )),
+  size = 12, size.unit = "pt") +
+  
+  scale_fill_gradient2(name = "Std. \u03B2", 
+                       low = "#2166AC", high = "#B2182B",
+                       na.value = "grey") +
+  
+  scale_y_discrete(name = NULL, labels = c(
+    "eff_control" = "Effortful control", 
+    "emot_abuse" = "Emotional abuse",
+    "life_events" = "Unpredictable \n life events",
+    "needed_food" = "Needed food",
+    "p_abuse" = "Physical abuse",
+    "p_depression" = "Parental depression",
+    "s_abuse" = "Sexual abuse",
+    "serious_accident" = "Serious accident/injury",
+    "sleep_hrs" = "Hours of sleep",
+    "tobacco_puff" = "Tried smoking",
+    "weightcontrol_ksads" = "Dieting",
+    "witness_comm_violence" = "Witnessed \n community violence",
+    "witness_dv" = "Witnessed \n domestic violence"
+  ), expand = c(0,0)) +
+  scale_x_discrete(name = NULL, labels = c(
+    "base" = "Baseline",
+    "y2" = "Y2"
+  ), expand = c(0,0)) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        axis.text = element_text(size = 12), 
+        legend.title = element_text(size=12),
+        plot.margin = unit(c(5,5,5,5), "pt"))
+```
+
+```{r}
+ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Fig_Coefs.png", plt, device = "png")
+```
+

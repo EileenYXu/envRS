@@ -13,7 +13,7 @@ editor_options:
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, results = "asis")
+knitr::opts_chunk$set(echo = TRUE, results = "asis")
 library(tidyverse)
 library(RColorBrewer)
 library(glmnet)
@@ -38,18 +38,17 @@ testIDs = test$src_subject_id
 
 ```{r}
 ## scale and centre numeric variables
+train$bullying_sex = train$bullying_victim * as.numeric(train$birthsex)
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
-train$bullying_sex = train$bullying_victim * as.numeric(train$birthsex)
 
-test = test |> mutate_at(numcols, ~ c(scale(.)) )
 test$bullying_sex = test$bullying_victim * as.numeric(test$birthsex)
-
+test = test |> mutate_at(numcols, ~ c(scale(.)) )
 ## remove columns that are not used for training data
-preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
+preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender, -gender_id) |> data.matrix()
 
 ## same for test data
-test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender) |> data.matrix()
+test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender, -gender_id) |> data.matrix()
 
 ## data for model
 dep = train$cbcl_dsm5_depress

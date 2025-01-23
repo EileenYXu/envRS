@@ -3,6 +3,7 @@ title: "ABCDv5.1 Y2 Scores"
 date: "`r Sys.Date()`"
 output:
   html_document:
+    code_folding: hide
     toc: true
     toc_float:
       collapsed: false
@@ -11,7 +12,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, results = "asis")
+knitr::opts_chunk$set(echo = TRUE, results = "asis")
 library(tidyverse)
 library(RColorBrewer)
 library(kableExtra)
@@ -30,18 +31,19 @@ trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
 
 ## scale and centre numeric variables
+train$bullying_gender = train$bullying_victim * as.numeric(train$gender)
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
-train$bullying_gender = train$bullying_victim * as.numeric(train$gender)
 
-test = test |> mutate_at(numcols, ~ c(scale(.)) )
 test$bullying_gender = test$bullying_victim * as.numeric(test$gender)
+test = test |> mutate_at(numcols, ~ c(scale(.)) )
+
 
 ## remove columns that are not used for training data
-preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
+preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex, -gender_id) |> data.matrix()
 
 ## remove columns not used in test data and make interactions
-test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex) |> data.matrix()
+test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex, -gender_id) |> data.matrix()
 
 ## outcomes for glm
 dep = train$cbcl_dsm5_depress
