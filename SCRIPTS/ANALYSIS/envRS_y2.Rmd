@@ -27,6 +27,8 @@ set.seed(2024)
 train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_traindat.rds") |> na.omit() |> filter(gender!="GNC")
 test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_testdat.rds") |> na.omit() |> filter(gender!="GNC")
 
+sumdat = list("whole"=rbind(train, test), "train" = train, "test" = test)
+
 trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
 
@@ -332,21 +334,26 @@ corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", or
 
 # Descriptives {.tabset}
 
+```{r}
+#get age in years
+sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = agemths/12)})
+```
+
 ## Whole sample
 
 ```{r results='asis'}
-summarytools::dfSummary(rbind(train, test)[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$whole[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Training sample
 
 ```{r results='asis'}
-summarytools::dfSummary(train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Test sample
 
 ```{r results='asis'}
-summarytools::dfSummary(test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
