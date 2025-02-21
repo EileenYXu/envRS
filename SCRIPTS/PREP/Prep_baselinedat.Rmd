@@ -1,7 +1,6 @@
 ---
 title: "Baseline ABCD v5.1 prep"
 author: "Eileen Xu"
-date: "2024-09-17"
 output: html_document
 editor_options: 
   chunk_output_type: inline
@@ -59,45 +58,10 @@ baseline = baseline %>% filter(!is.na(cbcl_internalising))
 sapply(baseline, function(x) sum(is.na(x))) |> kbl(col.names = c("", "N missing")) |> kable_styling() |> scroll_box()
 ```
 
-Little's MCAR test for continuous variables:
-
 ```{r}
-baseline |> select_if(~ is.numeric(.)) |> naniar::mcar_test() |> kbl() |> kable_styling()
-```
+## remove missing data
+baseline = baseline |> na.omit() |> droplevels()
 
-I had the (5-level) ethnicity variable in for mice imputation, but the imputed missing data is influenced by the other variables in the data (and thus entered into the model) and when it comes to longitudinal analysis it might make things overly complicated. Doing complete sample analysis instead.
-
-```{r}
-## split into train and test samples ##
-index = caret::createDataPartition(baseline$cbcl_internalising[which(is.na(baseline$cbcl_internalising)==F)], 
-                            p = 0.2, list = F, times = 1)
-traindat = baseline[-index,]
-testdat = baseline[index,]
-```
-
-## Descriptive statistics
-
-### Full sample
-
-```{r}
-baseline[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-### Training data:
-
-```{r}
-traindat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-### Test data:
-
-```{r}
-testdat[,-1] |> summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-
-```{r eval=FALSE}
-saveRDS(traindat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds")
-saveRDS(testdat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds")
+saveRDS(baseline, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_baseline.rds")
 ```
 
