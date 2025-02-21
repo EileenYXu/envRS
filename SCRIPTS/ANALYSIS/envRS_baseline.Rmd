@@ -94,7 +94,20 @@ train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
 test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
 
 data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
+```
 
+LASSO: $\alpha = 1$, Ridge: $\alpha = 0$.
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+```{r results='hide'}
+depcoef = coef(depfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
+names(depcoef)[2] = "depRS"
+```
+
+## Plot alpha
+
+```{r}
 ## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
 plot(log(depfits[[1]]$lambda), depfits[[1]]$cvm, col = pal[1], type = "l",
      xlab = "log(Lambda)", ylab = "Mean cross-validated error")
@@ -104,14 +117,6 @@ for (i in 2:length(depfits)) {
 legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
 ```
 
-Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
-
-For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
-
-```{r results='hide'}
-depcoef = coef(depfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
-names(depcoef)[2] = "depRS"
-```
 
 ## Plot predictions
 
@@ -175,6 +180,22 @@ test_mse = sapply(testfits, function(x) x$mse[["lambda.min"]])
 
 data.frame(train_mse = train_mse, test_mse = test_mse) |>  kbl() |> kable_styling() |> scroll_box(height = "300px")
 
+```
+
+LASSO: $\alpha = 1$, Ridge: $\alpha = 0$.
+
+Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
+
+
+```{r results='hide'}
+intcoef = coef(intfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
+names(intcoef)[2] = "intRS"
+```
+
+## Plot alpha
+
+```{r}
+
 ## plot MSE and log(Lambda) for each alpha value, with axis labels and legend
 plot(log(intfits[[1]]$lambda), intfits[[1]]$cvm, col = pal[1], type = "l",
      xlab = "log(Lambda)", ylab = "Mean cross-validated error")
@@ -184,14 +205,6 @@ for (i in 2:length(intfits)) {
 legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
 ```
 
-Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
-
-For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
-
-```{r results='hide'}
-intcoef = coef(intfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
-names(intcoef)[2] = "intRS"
-```
 
 ## Plot predictions
 
