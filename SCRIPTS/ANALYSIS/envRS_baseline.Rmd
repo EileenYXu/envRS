@@ -26,10 +26,18 @@ set.seed(2024)
 Predictors identified from quantitative reviews of adolescent MDD risk factors in baseline ABCD data are included in the model, along with interactions with gender (parent-reported child gender identity). I will also fit a model with interactions with birth sex too as a sensitivity analysis. 
 
 ```{r}
-## read in data, remove missing data and exclude individuals identifying as GNC (too few for meaningful effect from interaction I think)
-train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
-test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(gender != "GNC") |> droplevels()
+## read in data, exclude individuals identifying as GNC (too few for meaningful effect from interaction I think)
+dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_baseline.rds") |> filter(gender != "GNC") |> droplevels()
 
+## split into train and test samples 
+index = caret::createDataPartition(dat$cbcl_dsm5_depress, p = 0.2,
+                                   list = F, times = 1)
+train = dat[-index,]
+test = dat[index,]
+```
+
+
+```{r}
 trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
 
@@ -225,7 +233,7 @@ base_coefs = merge(depcoef, intcoef)
 # make row names the first column
 base_coefs = base_coefs
 
-write.csv(base_coefs, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/base_coefs.csv")
+write.csv(base_coefs, "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/base_coefs.csv")
 
 #base_coefs[-1] |> 
 #  kbl(digits=3) |> kable_styling() |> scroll_box(height = "300px")
@@ -240,7 +248,7 @@ base_coefs_sig = coef_long |> filter(abs(round(beta.min, 3))!=0)
 ## pivot this back to wide
 coefs_sig = base_coefs_sig |> pivot_wider(names_from = out, values_from = beta.min)
 
-write.csv(coefs_sig, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/base_coefs_sig.csv")
+write.csv(coefs_sig, "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/base_coefs_sig.csv")
 ```
 
 ```{r fig.height=15, fig.width=10}
@@ -252,7 +260,7 @@ ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
 
-ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/baseline_coefs_sig.svg", height = 200, width = 200, units = "mm")
+ggsave(filename = "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/baseline_coefs_sig.svg", height = 200, width = 200, units = "mm")
 ```
 
 ## CBCL depression
@@ -286,7 +294,7 @@ ggplot(coef_01, aes(x = out, y = preds, fill = beta.min)) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
 
-ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/baseline_01.svg", height = 140, width = 200, units = "mm")
+ggsave(filename = "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/baseline_01.svg", height = 140, width = 200, units = "mm")
 ```
 
 ## CBCL depression
@@ -307,9 +315,6 @@ intcoef[order(intcoef$intRS, decreasing = T),] |> filter(abs(intRS)>=0.01) |> kb
 ## Whole sample
 
 ```{r fig.width=10, fig.height=10}
-train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(gender != "GNC") #6090 individuals
-test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(gender != "GNC") #1499
-
 rbind(train, test) |> select(-src_subject_id, -race_ethnicity) |> data.matrix() |> 
 cor() |> 
 corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", order = "alphabet", tl.pos = "lt", tl.srt = 45, tl.cex=0.7, lower.col = "black", number.cex = 0.5, diag = "u") +
