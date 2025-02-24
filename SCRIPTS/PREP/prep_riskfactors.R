@@ -108,42 +108,61 @@ bmi = bmi |> filter(biv=="plausible") |> select(src_subject_id, eventname, bmi)
 
 #### demogs ####
 demog = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_p_demo.csv")
-demog = demog |> select(src_subject_id, eventname, demo_gender_id_v2, demo_gender_id_v2_l, demo_sex_v2,
-                         demo_fam_exp1_v2, demo_fam_exp1_v2_l,
-                         demo_comb_income_v2, demo_comb_income_v2_l,
-                         demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l, demo_prnt_ed_v2_l,
-                         race_ethnicity)
+demog = demog |> select(src_subject_id, eventname, demo_gender_id_v2, 
+                        demo_gender_id_v2_l, demo_sex_v2,
+                        demo_fam_exp1_v2, demo_fam_exp1_v2_l,
+                        demo_comb_income_v2, demo_comb_income_v2_l,
+                        demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l,
+                        demo_prnt_ed_v2_l, race_ethnicity) |> 
+  mutate(across(where(is.numeric), ~na_if(.,777)),
+         across(where(is.numeric), ~na_if(.,999)))
 
-demog = demog |> group_by(src_subject_id) |> fill(demo_sex_v2) |> fill(race_ethnicity)
+# sex and ethnicity data only collected at one timepoint so later timepoints need to be filled in first
+
+demog = demog |> group_by(src_subject_id) |> fill(demo_sex_v2) |> 
+  fill(race_ethnicity)
 demog = ungroup(demog)
 
-demog = demog |> mutate(across(where(is.numeric), ~na_if(.,777)),
-                         across(where(is.numeric), ~na_if(.,999)),
-                         needed_food = coalesce(demo_fam_exp1_v2, demo_fam_exp1_v2_l) |> 
-                           as.factor(),
-                         
-                         income = coalesce(demo_comb_income_v2, demo_comb_income_v2_l),
-                         
-                         parent_ed = coalesce(demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l,
-                                              demo_prnt_ed_v2_l)|> 
-                           factor(levels = c(1:23), labels = c(rep("less_HS", 12), "HS/GED", 
-                                                               "HS/GED", rep("Some_College", 5), "Bachelor", 
-                                                               rep("Postgrad", 3)), ordered = T),
-                         
-                         birthsex = factor(demo_sex_v2, levels = c("1","2", "3"), 
-                                           labels =c("M", "F", "Intersex")),
-                         
-                         gender_id = coalesce(demo_gender_id_v2, demo_gender_id_v2_l) |>  
-                          factor(levels = c(1,2,3,4,5,6), labels = c("Mcis", "Fcis", "Mtrans", "Ftrans", 
-                                                       "GNC", "Diff")),
-                         
-                         gender = coalesce(gender_id, birthsex) |> as.factor(),
-                        
-                         race_ethnicity = factor(race_ethnicity, levels = c(1, 2, 3, 4, 5),
-                                                 labels = c("White", "Black", "Hispanic", 
-                                                            "Asian", "Other")))
+# gender, needed food, income and parent education were collected at multiple timepoints so need to be grouped into a single column
 
-demog$gender = fct_recode(demog$gender, M = "Mcis", M="Mtrans", "F"="Fcis", "F"="Ftrans", GNC = "GNC", GNC="Diff")
+demog = demog |> mutate(
+  needed_food = coalesce(demo_fam_exp1_v2, demo_fam_exp1_v2_l),
+  income = coalesce(demo_comb_income_v2, demo_comb_income_v2_l),
+  parent_ed = coalesce(demo_prnt_ed_v2, demo_prnt_ed_v2_2yr_l,
+                              demo_prnt_ed_v2_l),
+  gender_id = coalesce(demo_gender_id_v2, demo_gender_id_v2_l))
+
+# recode factors with labels
+demog = demog |> mutate(
+  race_ethnicity = factor(race_ethnicity, 
+                          labels = c("White", "Black","Hispanic", 
+                                     "Asian", "Other")),
+  birthsex = factor(demo_sex_v2,
+                    labels =c("M", "F", "Intersex")),
+  gender_id = factor(gender_id,
+                     labels = c("M", "F", "Mtrans",
+                                "Ftrans", "GNC", "Diff"))
+)
+
+# use case_when for parent education and for gender variable where cis and trans people merged as one
+demog = demog |> mutate(
+  parent_ed = case_when(
+    is.na(parent_ed) ~ NA_character_,
+    parent_ed < 13 ~ "less_HS",
+    parent_ed == 13 | parent_ed == 14 ~ "HS/GED",
+    parent_ed %in% c(15, 16, 17, 22, 23) ~ "Some_College",
+    parent_ed == 18 ~ "Bachelor",
+    parent_ed %in% c(19:21) ~ "Postgraduate") |> 
+    as.factor(),
+  
+  gender = case_when(
+    is.na(birthsex) & is.na(gender_id) ~ NA_character_,
+    gender_id=="M" | gender_id=="Mtrans" | birthsex=="M" & is.na(gender_id) ~ "M",
+    gender_id=="F" | gender_id=="Ftrans" | birthsex=="F" & is.na(gender_id) ~ "F",
+    gender_id=="GNC" | gender_id=="Diff" ~ "GNC") |> 
+    as.factor()
+)
+
 
 demog = demog |> select(src_subject_id, eventname, needed_food, income, parent_ed, birthsex, gender_id, gender, race_ethnicity) |> droplevels()
 summary(demog)
