@@ -38,6 +38,8 @@ test = dat[index,]
 
 
 ```{r}
+sumdat = list("whole"=rbind(train, test), "train" = train, "test" = test)
+
 trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
 
@@ -57,7 +59,7 @@ dep = train$cbcl_dsm5_depress
 int = train$cbcl_internalising
 ```
 
-80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for applying to other data, I'm scaling the raw data before inputting to glmnet. Each elastic net model is run with 10-fold cross-validation and lambda/alpha values are selected based on minimising the model mean squared error (MSE).
+80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for numeric variables (easier to apply to other data), I'm scaling the raw data before inputting to glmnet. Each elastic net model is run with 10-fold cross-validation and lambda/alpha values are selected based on minimising the model mean squared error (MSE).
 
 
 `r ncol(preds)` predictors were included. No interactions with gender were included, as the 3 significant interactions (cannabis, social media, bullying) aren't present in baseline data.
@@ -358,22 +360,28 @@ corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", or
 
 # Descriptives {.tabset}
 
+```{r}
+#get age in years
+sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = agemths/12)})
+```
+
+
 ## Whole sample
 
 ```{r results='asis'}
-summarytools::dfSummary(rbind(train, test)[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$whole[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Training sample
 
 ```{r results='asis'}
-summarytools::dfSummary(train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Test sample
 
 ```{r results='asis'}
-summarytools::dfSummary(test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+summarytools::dfSummary(sumdat$test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 
