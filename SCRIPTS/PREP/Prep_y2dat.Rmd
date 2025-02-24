@@ -19,7 +19,7 @@ library(summarytools)
 
 ```{r}
 dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
-y2 = dat %>% filter(eventname=="2_year_follow_up_y_arm_1") %>% select_if(~ !all(is.na(.))) |> droplevels()
+y2 = dat |> filter(eventname=="2_year_follow_up_y_arm_1") |> select_if(~ !all(is.na(.))) |> droplevels()
 ```
 
 Total N = `r nrow(y2)` \
@@ -29,13 +29,13 @@ Total N = `r nrow(y2)` \
 40% missing = `r nrow(y2)*0.4` \
 50% missing = `r nrow(y2)*0.5` 
 
+Risk factors with >20% missing data were removed.
+
+TLFB alcohol includes data for `r sum(!is.na(y2$tlfb_cal_scr_alc_ud))` individuals, TLFB cannabis includes data for `r sum(!is.na(y2$su_tlfb_cal_scr_mj_days_yr))`. Total use days has data for `r sum(!is.na(y2$tlfb_cal_scr_num_events))`. Perhaps we could keep total use days data (as it combines alcohol, cannabis etc), filling missing values (which would be due to gating) with 0.
+
 ```{r}
 y2 |> select_if(~ is.numeric(.)) |> summary(.) |> kbl() |> kable_styling()
 ```
-
-Risk factors with >20% missing data were removed.
-
-TLFB alcohol includes data for `r sum(!is.na(y2$tlfb_cal_scr_alc_ud))` individuals, TLFB cannabis includes data for `r sum(!is.na(y2$su_tlfb_cal_scr_mj_days_yr))`. Total use days has data for `r sum(!is.na(y2$tlfb_cal_scr_num_events))`. Perhaps we could keep total use days data (combines alcohol, cannabis etc) and fill with 0?
 
 ```{r}
 y2 |> select_if(~ is.factor(.)) |> summary() |> kbl() |> kable_styling()
@@ -56,48 +56,11 @@ names(y2) = c("src_subject_id", "tlfb_use_days", "weightcontrol_ksads", "witness
 y2 = droplevels(y2)
 
 # remove cbcl missing data
-y2 = y2 %>% filter(!is.na(cbcl_internalising))
+y2 = y2 |> filter(!is.na(cbcl_internalising))
 sapply(y2, function(x) sum(is.na(x))) |> kbl(col.names = c("", "N missing")) |> kable_styling() |> scroll_box()
 ```
 
-Little's MCAR test for continuous variables:
-
 ```{r}
-y2 |> select_if(~ is.numeric(.)) |> naniar::mcar_test() |> kbl() |> kable_styling()
-```
-
-```{r}
-## split into train and test samples ##
-index = caret::createDataPartition(y2$cbcl_internalising[which(is.na(y2$cbcl_internalising)==F)], 
-                            p = 0.2, list = F, times = 1)
-traindat = y2[-index,]
-testdat = y2[index,]
-```
-
-## Descriptive statistics
-
-### Full sample
-
-```{r}
-y2[,-1] |>  dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-
-### Training data:
-
-```{r}
-traindat[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-### Test data:
-
-```{r}
-testdat[,-1] |> dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 500) |> print(method = "render")
-```
-
-
-```{r eval=FALSE}
-saveRDS(traindat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_traindat.rds")
-saveRDS(testdat, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/y2_testdat.rds")
+saveRDS(y2, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_y2.rds")
 ```
 
