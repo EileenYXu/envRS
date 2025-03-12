@@ -30,21 +30,22 @@ Model predicting year 2 CBCL using environmental factors measured at baseline.
 ```{r}
 dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
 
-y2CBCL = dat |> filter(eventname=="2_year_follow_up_y_arm_1") |> select(src_subject_id, cbcl_scr_dsm5_depress_r, cbcl_scr_syn_internal_r) |> drop_na(cbcl_scr_dsm5_depress_r, cbcl_scr_dsm5_depress_r)
+y2CBCL = dat |> filter(eventname=="2_year_follow_up_y_arm_1") |> select(src_subject_id, interview_age, cbcl_scr_dsm5_depress_r, cbcl_scr_syn_internal_r) |> drop_na(cbcl_scr_dsm5_depress_r, cbcl_scr_dsm5_depress_r) |> 
+  mutate(y2_age = interview_age/12) |> select(-interview_age)
 
 baseline = dat |> select(-cbcl_scr_syn_internal_r, -cbcl_scr_dsm5_depress_r) |> filter(eventname=="baseline_year_1_arm_1") |> select_if(~ !all(is.na(.))) |> droplevels()
 
 #merge in y2 CBCL
-dat.mod = merge(baseline, y2CBCL, by = "src_subject_id")
+alldat = merge(baseline, y2CBCL, by = "src_subject_id")
 ```
 
 N = `r nrow(y2CBCL)` individuals with CBCL data at year 2
 
 ```{r}
 ## remove baseline features with >20% missing data
-dat.mod = dat.mod |> select_if(~ sum(is.na(.))<0.2*nrow(dat.mod))
+dat.mod = alldat |> select_if(~ sum(is.na(.))<0.2*nrow(alldat))
 
-dat.mod = dat.mod |> select(-c(eventname, illicit, site_id_l, rel_family_id, rel_birth_id, interview_date, visit_type, race_ethnicity))
+dat.mod = dat.mod |> select(-c(eventname, illicit, site_id_l, rel_family_id, rel_birth_id, interview_date, visit_type, race_ethnicity, y2_age))
 
 names(dat.mod) = c("src_subject_id", "tobacco_puff", "weightcontrol_ksads",
                     "witness_comm_violence", "death_loved_one",
@@ -79,10 +80,13 @@ Total N = `r nrow(dat)` split into training 80/% (N = `r nrow(train)`) and test 
 # CBCL DSM5-oriented depression subscale {.tabset}
 
 ```{r}
-sumdat = list("whole"=rbind(train, test), "train" = train, "test" = test)
-
 trainIDs = train$src_subject_id
 testIDs = test$src_subject_id
+
+#for summary stats
+sumdat = list("whole"=alldat[which(alldat$src_subject_id %in% c(trainIDs, testIDs)),],
+              "train" = alldat[which(alldat$src_subject_id %in% c(trainIDs)),], 
+              "test" = alldat[which(alldat$src_subject_id %in% c(testIDs)),])
 
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
@@ -393,7 +397,7 @@ corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", or
 
 ```{r}
 #get age in years
-sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = agemths/12)})
+sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = interview_age/12)})
 ```
 
 ## Whole sample

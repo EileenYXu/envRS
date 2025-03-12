@@ -98,8 +98,9 @@ erq = erq |> select(src_subject_id, eventname, suppress_pr)
 #### sleep duration ####
 sleep = read.csv("G://data/abcd/release5.1/core/physical-health/ph_p_sds.csv")
 sleep = sleep |> select(src_subject_id, eventname, sleepdisturb1_p) |> mutate(
-  sleep_hrs = factor(sleepdisturb1_p, labels = c("9+hrs", "8-9hrs", "7-8hrs","5-7hrs", "<5hrs"),ordered = T)
+  sleep_hrs = factor(sleepdisturb1_p, labels = c("9+hrs", "8-9hrs", "7-8hrs","5-7hrs", "<5hrs"), ordered = T)
 )
+sleep$sleep_hrs = fct_rev(sleep$sleep_hrs)
 sleep = sleep |> select(src_subject_id, eventname, sleep_hrs)
 
 #### bmi ####
