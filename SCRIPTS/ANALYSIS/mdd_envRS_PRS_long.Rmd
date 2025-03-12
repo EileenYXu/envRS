@@ -21,6 +21,8 @@ library(pROC)
 library(summarytools)
 define_keywords(title.dfSummary = "NA")
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
+
+set.seed(2025)
 ```
 
 This is an **updated script** for predicting *binary* lifetime MDD from depRS and PRS. depRS was trained on a *continuous* outcome - CBCL DSM5-oriented depression scores at year 2 from environmental factors at baseline. PRS were based on the MDD3 GWAS - we selected the threshold and timepoint with the best prediction. All continuous variables have been mean centred and standardised for comparison of effect sizes. 
@@ -32,53 +34,28 @@ For (a) self-reported and (b) parent-reported lifetime MDD, we compare the follo
 Single predictor:\
 (m1depRS) Y2 MDD \~ depRS\
 (m1PRS) Y2 MDD \~ PRS\
-(m1CBCL) Y2 MDD \~ baseline CBCL depression\
 
 (m2) Y2 MDD \~ depRS + PRS\
-(m2CBCL) Y2 MDD \~ depRS + baseline CBCL depression\
-(m3) Y2 MDD \~ depRS + PRS + baseline CBCL depression
+(m3) Y2 MDD \~ depRS*PRS
 
 ```{r}
-ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/unrelatedIDs.rds")
-
-cbcl = read.csv("G://data/abcd/release5.1/core/mental-health/mh_p_cbcl.csv") |>
-  filter(src_subject_id %in% ids) |> 
-  select(src_subject_id, eventname, cbcl_scr_syn_internal_r,
-         cbcl_scr_dsm5_depress_r)
-
-names(cbcl) = c("src_subject_id", "eventname", "CBCL_int", "CBCL_dep")
-
-lt = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_y_lt.csv") |> filter(src_subject_id %in% ids) |> 
-  select(src_subject_id, eventname, interview_age) |> 
-  mutate(age_yrs = interview_age/12)
-
-cbcl = merge(lt, cbcl, by = c("src_subject_id", "eventname"))
-
-cbcl_base = cbcl |> filter(eventname=="baseline_year_1_arm_1") |> 
-  mutate(across("CBCL_int":"CBCL_dep", scale))
-
 PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS) |> mutate(across(where(is.numeric), scale))
 
 depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |> select(src_subject_id, lambda.min)
 names(depRS) = c("src_subject_id", "depRS")
-intRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_long.rds") |> select(src_subject_id, lambda.min)
-names(intRS) = c("src_subject_id", "intRS")
-
-envRS = merge(depRS, intRS, by = "src_subject_id") |>
+depRS = depRS |>
   mutate(across(where(is.numeric), scale))
 
-scores = merge(envRS, PRS, by.x = "src_subject_id", by.y = "IID")
-scores = merge(scores, cbcl_base, by = "src_subject_id")
+scores = merge(depRS, PRS, by.x = "src_subject_id", by.y = "IID")
 ```
 
 depRS was available for N=`r nrow(depRS)` participants.\
 PRS was available for N=`r nrow(PRS)` participants.\
-Baseline CBCL was available for N=`r nrow(cbcl_base)` participants.\
 
-A total N=`r nrow(scores)` participants had complete depRS, PRS and baseline CBCL data. Analyses will be conducted in this sample.
+A total N=`r nrow(scores)` participants had complete depRS and PRS data. Analyses will be conducted in this sample.
 
 ```{r}
-rm(cbcl, cbcl_base, depRS, envRS, intRS, lt, PRS, ids)
+rm(depRS, PRS)
 ```
 
 # (a) Youth self-reported MDD
@@ -93,6 +70,8 @@ dat.y |> summarise(
   LifetimeMDD = sum(mdd_lifetime=="1"),
   LifetimeAny = sum(any_lifetime=="1")
 ) |> kbl(digits = 3)
+
+prs_youth = dat.y |> select(src_subject_id, mdd_lifetime)
 ```
 
 Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. N=`r nrow(filter(dat.y, any_lifetime==1))` participants had a lifetime diagnosis of any depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified).
@@ -102,13 +81,10 @@ Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, the
 ```{r}
 m1depRS = glm(mdd_lifetime ~ depRS, dat.y, family = binomial(link = "logit"))
 m1PRS = glm(mdd_lifetime ~ PRS, dat.y, family = binomial(link = "logit"))
-m1CBCL = glm(mdd_lifetime ~ CBCL_dep, dat.y, family = binomial(link = "logit"))
 
-m2CBCL = glm(mdd_lifetime ~ depRS + CBCL_dep, 
-         dat.y, family = binomial(link = "logit"))
 m2 = glm(mdd_lifetime ~ depRS + PRS, 
          dat.y, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS + PRS + CBCL_dep,
+m3 = glm(mdd_lifetime ~ depRS*PRS,
          dat.y, family = binomial(link = "logit"))
 ```
 
@@ -124,99 +100,65 @@ test_performance(m1depRS, m2, m3) |> display(digits=3)
 test_performance(m1PRS, m2, m3) |> display(digits=3)
 ```
 
-### ~ baseline CBCL depression
+## Performance metrics
 
 ```{r}
-test_performance(m1CBCL, m2CBCL, m3) |> display(digits=3)
+mods = list(m1depRS, m1PRS, m2, m3)
+
+compare_performance(mods, verbose = F) |> 
+  mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+
+lapply(mods, performance_accuracy) |> 
+  lapply(as.data.frame) |> 
+  bind_rows(.id = "model") |> 
+  mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
 ```
 
-## Performance metrics {.tabset}
-
-### Single predictor models
+## Model estimates
 
 ```{r}
-mods.s = list(m1depRS, m1PRS, m1CBCL)
-
-compare_performance(mods.s, verbose = F) |> display(digits=3)
-
-accs.s = lapply(mods.s, performance_accuracy) 
-
-accs.s = lapply(accs.s, as.data.frame) |> bind_rows(.id = "model")
-accs.s$model = c("depRS", "PRS", "baseline CBCL")
-kable(accs.s, digits = 3) |> kable_styling()
+sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
 ```
 
-### Multivariable models
-
-```{r}
-mods.m = list(m2, m2CBCL, m3)
-
-compare_performance(mods.m, verbose = F) |> display(digits=3)
-
-accs.m = lapply(mods.m, performance_accuracy) 
-
-accs.m = lapply(accs.m, as.data.frame) |> bind_rows(.id = "model")
-accs.m$model = c("depRS + PRS", "depRS + CBCL", "depRS + PRS + CBCL")
-kable(accs.m, digits = 3) |> kable_styling()
-```
-
-## Model estimates {.tabset}
-
-### Single predictor models
-
-```{r}
-sjPlot::tab_model(mods.s, dv.labels = c("depRS", "PRS", "baseline CBCL"), collapse.ci = T, show.se = T, show.stat = T)
-```
-
-### Multivariable models
-
-```{r}
-sjPlot::tab_model(mods.m, dv.labels = c("depRS + PRS", "depRS + CBCL", "depRS + PRS + CBCL"), collapse.ci = T, show.se = T, show.stat = T)
-```
-
-## ROC curves {.tabset}
+## ROC curves
 
 ```{r}
 #ROC curves for each model
 dat.y = dat.y |> mutate(
   m1depRS = m1depRS$fitted.values,
   m1PRS = m1PRS$fitted.values,
-  m1CBCL = m1CBCL$fitted.values,
   m2 = m2$fitted.values,
-  m2CBCL = m2CBCL$fitted.values,
   m3 = m3$fitted.values
 )
 
-mods = c("m1depRS", "m1PRS", "m1CBCL", "m2", "m2CBCL", "m3")
+mods = c("m1depRS", "m1PRS", "m2", "m3")
 
-rocs = list()
+rocs.y = list()
 for (m in 1:length(mods)) {
   out = roc(dat.y$mdd_lifetime, dat.y[,mods[m]], 
             ci = TRUE, auc = TRUE)
-  rocs[[mods[m]]] = out
+  rocs.y[[mods[m]]] = out
 }
 ```
 
-### Single predictors
-
 ```{r}
-ggroc(list("depRS" = rocs$m1depRS, "PRS" = rocs$m1PRS, "CBCL" = rocs$m1CBCL)) +
+youth = ggroc(list("depRS" = rocs.y$m1depRS, "PRS" = rocs.y$m1PRS, "depRS + PRS" = rocs.y$m2, "depRS*PRS" = rocs.y$m3)) +
   scale_color_manual(values = pal) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
   theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
+
+youth
+
+par("din")
 ```
 
-### depRS vs m2 and m3
 
 ```{r}
-ggroc(list("depRS" = rocs$m1depRS, "+PRS" = rocs$m2, "+PRS+CBCL" = rocs$m3)) +
-  scale_color_manual(values = pal) +
-  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
-  theme_bw() + 
-  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_youth.png", youth, device = "png", create.dir = TRUE, width = 6, height = 4, units = "in")
 ```
-
 
 # (b) Parent-reported MDD
 
@@ -230,6 +172,8 @@ dat.p |> summarise(
   LifetimeMDD = sum(mdd_lifetime=="1"),
   LifetimeAny = sum(any_lifetime=="1")
 ) |> kbl(digits = 3)
+
+prs_parent = dat.p |> select(src_subject_id, mdd_lifetime)
 ```
 
 Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. N=`r nrow(filter(dat.y, any_lifetime==1))` participants had a lifetime diagnosis of any depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified).
@@ -239,13 +183,10 @@ Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, the
 ```{r}
 m1depRS = glm(mdd_lifetime ~ depRS, dat.p, family = binomial(link = "logit"))
 m1PRS = glm(mdd_lifetime ~ PRS, dat.p, family = binomial(link = "logit"))
-m1CBCL = glm(mdd_lifetime ~ CBCL_dep, dat.p, family = binomial(link = "logit"))
 
-m2CBCL = glm(mdd_lifetime ~ depRS + CBCL_dep, 
-         dat.p, family = binomial(link = "logit"))
 m2 = glm(mdd_lifetime ~ depRS + PRS, 
          dat.p, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS + PRS + CBCL_dep,
+m3 = glm(mdd_lifetime ~ depRS*PRS,
          dat.p, family = binomial(link = "logit"))
 ```
 
@@ -261,96 +202,139 @@ test_performance(m1depRS, m2, m3) |> display(digits=3)
 test_performance(m1PRS, m2, m3) |> display(digits=3)
 ```
 
-### ~ baseline CBCL depression
+## Performance metrics
 
 ```{r}
-test_performance(m1CBCL, m2CBCL, m3) |> display(digits=3)
+mods = list(m1depRS, m1PRS, m2, m3)
+
+compare_performance(mods, verbose = F) |> 
+  mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+
+lapply(mods, performance_accuracy) |> 
+  lapply(as.data.frame) |> 
+  bind_rows(.id = "model") |> 
+  mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
 ```
 
-## Performance metrics {.tabset}
-
-### Single predictor models
+## Model estimates
 
 ```{r}
-mods.s = list(m1depRS, m1PRS, m1CBCL)
-
-compare_performance(mods.s, verbose = F) |> display(digits=3)
-
-accs.s = lapply(mods.s, performance_accuracy) 
-
-accs.s = lapply(accs.s, as.data.frame) |> bind_rows(.id = "model")
-accs.s$model = c("depRS", "PRS", "baseline CBCL")
-kable(accs.s, digits = 3) |> kable_styling()
+sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
 ```
 
-### Multivariable models
-
-```{r}
-mods.m = list(m2, m2CBCL, m3)
-
-compare_performance(mods.m, verbose = F) |> display(digits=3)
-
-accs.m = lapply(mods.m, performance_accuracy) 
-
-accs.m = lapply(accs.m, as.data.frame) |> bind_rows(.id = "model")
-accs.m$model = c("depRS + PRS", "depRS + CBCL", "depRS + PRS + CBCL")
-kable(accs.m, digits = 3) |> kable_styling()
-```
-
-## Model estimates {.tabset}
-
-### Single predictor models
-
-```{r}
-sjPlot::tab_model(mods.s, dv.labels = c("depRS", "PRS", "baseline CBCL"), collapse.ci = T, show.se = T, show.stat = T)
-```
-
-### Multivariable models
-
-```{r}
-sjPlot::tab_model(mods.m, dv.labels = c("depRS + PRS", "depRS + CBCL", "depRS + PRS + CBCL"), collapse.ci = T, show.se = T, show.stat = T)
-```
-
-## ROC curves {.tabset}
+## ROC curves
 
 ```{r}
 #ROC curves for each model
 dat.p = dat.p |> mutate(
   m1depRS = m1depRS$fitted.values,
   m1PRS = m1PRS$fitted.values,
-  m1CBCL = m1CBCL$fitted.values,
   m2 = m2$fitted.values,
-  m2CBCL = m2CBCL$fitted.values,
   m3 = m3$fitted.values
 )
 
-mods = c("m1depRS", "m1PRS", "m1CBCL", "m2", "m2CBCL", "m3")
+mods = c("m1depRS", "m1PRS", "m2", "m3")
 
-rocs = list()
+rocs.p = list()
 for (m in 1:length(mods)) {
   out = roc(dat.p$mdd_lifetime, dat.p[,mods[m]], 
             ci = TRUE, auc = TRUE)
-  rocs[[mods[m]]] = out
+  rocs.p[[mods[m]]] = out
 }
 ```
 
-### Single predictors
 
 ```{r}
-ggroc(list("depRS" = rocs$m1depRS, "PRS" = rocs$m1PRS, "CBCL" = rocs$m1CBCL)) +
+parent = ggroc(list("depRS" = rocs.p$m1depRS, "PRS" = rocs.p$m1PRS, "depRS + PRS" = rocs.p$m2, "depRS*PRS" = rocs.p$m3)) +
   scale_color_manual(values = pal) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
   theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
-```
 
-### depRS vs m2 and m3
+parent
+```
 
 ```{r}
-ggroc(list("depRS" = rocs$m1depRS, "+PRS" = rocs$m2, "+PRS+CBCL" = rocs$m3)) +
-  scale_color_manual(values = pal) +
-  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
-  theme_bw() + 
-  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_parent.png", parent, device = "png", create.dir = TRUE, width = 6, height = 4, units = "in")
 ```
 
+## ROC figure
+
+```{r eval=FALSE}
+library(patchwork)
+
+ptch_plot = parent + theme(legend.position = "none") + ggtitle("(A)") | youth + ggtitle("(B)")
+```
+
+```{r}
+#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_fig.png", ptch_plot, device = "png", create.dir = TRUE, width = 9, height = 4, units = "in")
+```
+
+# Descriptives
+
+## youth
+
+```{r}
+y.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_youth$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+
+y2age = y.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
+y.base = y.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
+
+prs_youth = merge(prs_youth, y2age)
+prs_youth = merge(prs_youth, y.base)
+```
+
+### all
+
+```{r}
+summarytools::dfSummary(prs_youth[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### case
+
+```{r}
+prs_youth[,-1] |> filter(mdd_lifetime==1) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### control
+
+```{r}
+prs_youth[,-1] |> filter(mdd_lifetime==0) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+
+## parent
+
+```{r}
+p.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_parent$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+
+y2age = p.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
+p.base = p.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
+
+prs_parent = merge(prs_parent, y2age)
+prs_parent = merge(prs_parent, p.base)
+```
+
+### all
+
+```{r}
+summarytools::dfSummary(prs_parent[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### case
+
+```{r}
+prs_parent[,-1] |> filter(mdd_lifetime==1) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### control
+
+```{r}
+prs_parent[,-1] |> filter(mdd_lifetime==0) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
