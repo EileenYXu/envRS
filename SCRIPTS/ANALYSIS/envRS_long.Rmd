@@ -191,6 +191,16 @@ ggplot(depRS, aes(y = cbcl_dep, x = lambda.min, colour = data)) +
   labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
 ```
 
+## R-square
+
+```{r}
+testlm = lm(cbcl_dep ~ lambda.min, depRS_test)
+trainlm = lm(cbcl_dep ~ lambda.min, depRS_train)
+bothlm = lm(cbcl_dep ~ lambda.min, depRS)
+
+sjPlot::tab_model(list(testlm, trainlm, bothlm), dv.labels = c("test", "train", "whole"))
+```
+
 # CBCL internalising subscale {.tabset}
 
 ## Cross-validation
@@ -274,6 +284,16 @@ ggplot(intRS, aes(y = cbcl_int, x = lambda.min, colour = data)) +
   geom_smooth() +
   theme_bw() +
   labs(x = "predicted intRS", y = "CBCL internalising (scaled and centred)")
+```
+
+## R-square
+
+```{r}
+testlm = lm(cbcl_int ~ lambda.min, intRS_test)
+trainlm = lm(cbcl_int ~ lambda.min, intRS_train)
+bothlm = lm(cbcl_int ~ lambda.min, intRS)
+
+sjPlot::tab_model(list(testlm, trainlm, bothlm), dv.labels = c("test", "train", "whole"))
 ```
 
 # Coefficients {.tabset}
