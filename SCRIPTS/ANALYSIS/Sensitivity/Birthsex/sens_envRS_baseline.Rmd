@@ -25,32 +25,43 @@ pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 # Sensitivity analyses using birthsex instead of gender
 
 ```{r}
-train = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_traindat.rds") |> na.omit() |> filter(birthsex != "Intersex") |> droplevels()
-test = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/baseline_testdat.rds") |> na.omit() |> filter(birthsex != "Intersex") |> droplevels()
+## read in data, exclude individuals identifying as Intersex (too few for meaningful effect from interaction I think)
+dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_baseline.rds") |> filter(birthsex != "Intersex") |> droplevels()
 
-trainIDs = train$src_subject_id
-testIDs = test$src_subject_id
+## split into train and test samples 
+index = caret::createDataPartition(dat$cbcl_dsm5_depress, p = 0.2,
+                                   list = F, times = 1)
+train = dat[-index,]
+test = dat[index,]
 ```
 
 
 ```{r}
+sumdat = list("whole"=rbind(train, test), "train" = train, "test" = test)
+
+trainIDs = train$src_subject_id
+testIDs = test$src_subject_id
+
 ## scale and centre numeric variables
 numcols = names(train)[lapply(train, is.numeric)==T]
 train = train |> mutate_at(numcols, ~ c(scale(.)) )
 test = test |> mutate_at(numcols, ~ c(scale(.)) )
 
 ## remove columns that are not used for training data
-preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender, -gender_id) |> data.matrix()
+preds = train |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex, -gender_id) |> data.matrix()
 
 ## same for test data
-test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -gender, -gender_id) |> data.matrix()
+test_preds = test |> select(-src_subject_id, -race_ethnicity, -cbcl_internalising, -cbcl_dsm5_depress, -birthsex, -gender_id) |> data.matrix()
 
 ## data for model
 dep = train$cbcl_dsm5_depress
 int = train$cbcl_internalising
 ```
 
-Training sample `r nrow(train)`, test sample `r nrow(test)`.
+80-20 training-test split. Training sample N=`r nrow(train)`, test sample N=`r nrow(test)`. Although glmnet standardises data by default, coefficients are returned on their original scales. To get standardised coefficients for numeric variables (easier to apply to other data), I'm scaling the raw data before inputting to glmnet. Each elastic net model is run with 10-fold cross-validation and lambda/alpha values are selected based on minimising the model mean squared error (MSE).
+
+
+`r ncol(preds)` predictors were included. No interactions with gender were included, as the 3 significant interactions (cannabis, social media, bullying) aren't present in baseline data.
 
 # CBCL DSM5-oriented depression subscale {.tabset}
 
@@ -130,6 +141,16 @@ ggplot(depRS, aes(y = cbcl_dep, x = lambda.min, colour = data)) +
   labs(x = "predicted depRS", y = "CBCL depression (scaled and centred)")
 ```
 
+## R-square
+
+```{r}
+testlm = lm(cbcl_dep ~ lambda.min, depRS_test)
+trainlm = lm(cbcl_dep ~ lambda.min, depRS_train)
+bothlm = lm(cbcl_dep ~ lambda.min, depRS)
+
+sjPlot::tab_model(list(testlm, trainlm, bothlm), dv.labels = c("test", "train", "whole"))
+```
+
 # CBCL internalising subscale {.tabset}
 
 ## Cross-validation
@@ -173,8 +194,6 @@ legend("topright", legend = paste0("alpha = ", alphas), col = pal, lty = 1)
 ```
 
 Alpha value with the lowest MSE in training sample = `r rownames(data.frame(train_mse))[which.min(train_mse)]`. Coefficients from this model will be used.  
-
-For comparison, alpha value with lowest MSE in test sample = `r rownames(data.frame(test_mse))[which.min(test_mse)]`
 
 ```{r results='hide'}
 intcoef = coef(intfits[[which.min(train_mse)]], s = "lambda.min") |> as.matrix() |> as.data.frame() |> rownames_to_column(var = "preds")
