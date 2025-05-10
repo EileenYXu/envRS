@@ -19,15 +19,13 @@ library(kableExtra)
 library(performance)
 library(pROC)
 library(summarytools)
-define_keywords(title.dfSummary = "NA")
+define_keywords(title.dfSummary = "NA", ask = F)
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 
 set.seed(2025)
 ```
 
-This is an **updated script** for predicting *binary* lifetime MDD from depRS and PRS. depRS was trained on a *continuous* outcome - CBCL DSM5-oriented depression scores at year 2 from environmental factors at baseline. PRS were based on the MDD3 GWAS - we selected the threshold and timepoint with the best prediction. All continuous variables have been mean centred and standardised for comparison of effect sizes. 
-
-Similar analyses using the *cross-sectional* depRS model trained on *baseline CBCL* are in the file `envRS_PRS_main.Rmd`.\
+This script contains supplemental analyses predicting **binary** lifetime MDD at Year 2 from depRS and MDD PRS from the 2025 PGC GWAS. PRS for EUR participants are estimated using **European-only sumstats**, PRS for AFR, EAS and AMR participants are estimated using the **diverse ancestry sumstats**. PRS for AMR participants were estimated with the EUR ancestry LD matrix. depRS was trained to predict **continuous** CBCL DSM5-oriented depression subscale scores - measured at Year 2 - from 23 environmental factors measured at baseline. depRS and PRS are mean centred and standardised for comparison of ORs.
 
 For (a) self-reported and (b) parent-reported lifetime MDD, we compare the following models: 
 
@@ -38,15 +36,18 @@ Single predictor:\
 (m2) Y2 MDD \~ depRS + PRS\
 (m3) Y2 MDD \~ depRS*PRS
 
+
 ```{r}
-PRS = read.table("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/poppy_PRS/abcd_mdd3_prs_1024.t3.5.best", header = T) |> select(IID, PRS) |> mutate(across(where(is.numeric), scale))
+mdd2025 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/mdd25_prs.rds")
+PRS = bind_rows(mdd2025$afr, mdd2025$eas, mdd2025$amr_diverse, mdd2025$eur_european)
 
-depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |> select(src_subject_id, lambda.min)
-names(depRS) = c("src_subject_id", "depRS")
-depRS = depRS |>
-  mutate(across(where(is.numeric), scale))
+depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |>
+  select(src_subject_id, lambda.min)
 
-scores = merge(depRS, PRS, by.x = "src_subject_id", by.y = "IID")
+scores = merge(depRS, PRS, by.x = "src_subject_id", by.y = "IID") |> 
+  mutate(across(where(is.numeric), scale)) |> 
+  mutate(across(where(is.matrix), as.numeric))
+names(scores) = c("src_subject_id", "depRS", "PRS")
 ```
 
 depRS was available for N=`r nrow(depRS)` participants.\
@@ -68,48 +69,48 @@ dat.y = merge(scores, mddy$y2, by = "src_subject_id")
 dat.y |> summarise(
   N = n(),
   LifetimeMDD = sum(mdd_lifetime=="1"),
-  LifetimeAny = sum(any_lifetime=="1")
+  NoMDD = sum(mdd_lifetime=="0")
 ) |> kbl(digits = 3)
 
 prs_youth = dat.y |> select(src_subject_id, mdd_lifetime)
 ```
 
-Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. N=`r nrow(filter(dat.y, any_lifetime==1))` participants had a lifetime diagnosis of any depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified).
+Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. 
 
 ## Model comparisons {.tabset}
 
 ```{r}
-m1depRS = glm(mdd_lifetime ~ depRS, dat.y, family = binomial(link = "logit"))
-m1PRS = glm(mdd_lifetime ~ PRS, dat.y, family = binomial(link = "logit"))
+m1depRS.y = glm(mdd_lifetime ~ depRS, dat.y, family = binomial(link = "logit"))
+m1PRS.y = glm(mdd_lifetime ~ PRS, dat.y, family = binomial(link = "logit"))
 
-m2 = glm(mdd_lifetime ~ depRS + PRS, 
+m2.y = glm(mdd_lifetime ~ depRS + PRS, 
          dat.y, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS*PRS,
+m3.y = glm(mdd_lifetime ~ depRS*PRS,
          dat.y, family = binomial(link = "logit"))
 ```
 
 ### ~ depRS
 
 ```{r}
-test_performance(m1depRS, m2, m3) |> display(digits=3)
+test_performance(m1depRS.y, m2.y, m3.y) |> display(digits=3)
 ```
 
 ### ~ PRS
 
 ```{r}
-test_performance(m1PRS, m2, m3) |> display(digits=3)
+test_performance(m1PRS.y, m2.y, m3.y) |> display(digits=3)
 ```
 
 ## Performance metrics
 
 ```{r}
-mods = list(m1depRS, m1PRS, m2, m3)
+mods.y = list(m1depRS.y, m1PRS.y, m2.y, m3.y)
 
-compare_performance(mods, verbose = F) |> 
+compare_performance(mods.y, verbose = F) |> 
   mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
   kable(digits = 3) |> kable_styling()
 
-lapply(mods, performance_accuracy) |> 
+lapply(mods.y, performance_accuracy) |> 
   lapply(as.data.frame) |> 
   bind_rows(.id = "model") |> 
   mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
@@ -119,7 +120,7 @@ lapply(mods, performance_accuracy) |>
 ## Model estimates
 
 ```{r}
-sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+sjPlot::tab_model(mods.y, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
 ```
 
 ## ROC curves
@@ -127,16 +128,16 @@ sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"),
 ```{r}
 #ROC curves for each model
 dat.y = dat.y |> mutate(
-  m1depRS = m1depRS$fitted.values,
-  m1PRS = m1PRS$fitted.values,
-  m2 = m2$fitted.values,
-  m3 = m3$fitted.values
+  m1depRS = m1depRS.y$fitted.values,
+  m1PRS = m1PRS.y$fitted.values,
+  m2 = m2.y$fitted.values,
+  m3 = m3.y$fitted.values
 )
 
 mods = c("m1depRS", "m1PRS", "m2", "m3")
 
 rocs.y = list()
-for (m in 1:length(mods)) {
+for (m in 1:length(mods.y)) {
   out = roc(dat.y$mdd_lifetime, dat.y[,mods[m]], 
             ci = TRUE, auc = TRUE)
   rocs.y[[mods[m]]] = out
@@ -152,12 +153,7 @@ youth = ggroc(list("depRS" = rocs.y$m1depRS, "PRS" = rocs.y$m1PRS, "depRS + PRS"
 
 youth
 
-par("din")
-```
-
-
-```{r}
-#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_youth.png", youth, device = "png", create.dir = TRUE, width = 6, height = 4, units = "in")
+#par("din")
 ```
 
 # (b) Parent-reported MDD
@@ -170,48 +166,48 @@ dat.p = merge(scores, mddp$y2, by = "src_subject_id")
 dat.p |> summarise(
   N = n(),
   LifetimeMDD = sum(mdd_lifetime=="1"),
-  LifetimeAny = sum(any_lifetime=="1")
+  NoMDD = sum(mdd_lifetime=="0")
 ) |> kbl(digits = 3)
 
 prs_parent = dat.p |> select(src_subject_id, mdd_lifetime)
 ```
 
-Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. N=`r nrow(filter(dat.y, any_lifetime==1))` participants had a lifetime diagnosis of any depressive disorder (Major Depressive Disorder, Persistent Depressive Disorder (dysthymia), Depressive Disorder Unspecified).
+Of the N=`r nrow(dat.p)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.p, mdd_lifetime==1))` lifetime MDD cases.
 
 ## Model comparisons {.tabset}
 
 ```{r}
-m1depRS = glm(mdd_lifetime ~ depRS, dat.p, family = binomial(link = "logit"))
-m1PRS = glm(mdd_lifetime ~ PRS, dat.p, family = binomial(link = "logit"))
+m1depRS.p = glm(mdd_lifetime ~ depRS, dat.p, family = binomial(link = "logit"))
+m1PRS.p = glm(mdd_lifetime ~ PRS, dat.p, family = binomial(link = "logit"))
 
-m2 = glm(mdd_lifetime ~ depRS + PRS, 
+m2.p = glm(mdd_lifetime ~ depRS + PRS, 
          dat.p, family = binomial(link = "logit"))
-m3 = glm(mdd_lifetime ~ depRS*PRS,
+m3.p = glm(mdd_lifetime ~ depRS*PRS,
          dat.p, family = binomial(link = "logit"))
 ```
 
 ### ~ depRS
 
 ```{r}
-test_performance(m1depRS, m2, m3) |> display(digits=3)
+test_performance(m1depRS.p, m2.p, m3.p) |> display(digits=3)
 ```
 
 ### ~ PRS
 
 ```{r}
-test_performance(m1PRS, m2, m3) |> display(digits=3)
+test_performance(m1PRS.p, m2.p, m3.p) |> display(digits=3)
 ```
 
 ## Performance metrics
 
 ```{r}
-mods = list(m1depRS, m1PRS, m2, m3)
+mods.p = list(m1depRS.p, m1PRS.p, m2.p, m3.p)
 
-compare_performance(mods, verbose = F) |> 
+compare_performance(mods.p, verbose = F) |> 
   mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
   kable(digits = 3) |> kable_styling()
 
-lapply(mods, performance_accuracy) |> 
+lapply(mods.p, performance_accuracy) |> 
   lapply(as.data.frame) |> 
   bind_rows(.id = "model") |> 
   mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
@@ -221,7 +217,7 @@ lapply(mods, performance_accuracy) |>
 ## Model estimates
 
 ```{r}
-sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+sjPlot::tab_model(mods.p, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
 ```
 
 ## ROC curves
@@ -229,10 +225,10 @@ sjPlot::tab_model(mods, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"),
 ```{r}
 #ROC curves for each model
 dat.p = dat.p |> mutate(
-  m1depRS = m1depRS$fitted.values,
-  m1PRS = m1PRS$fitted.values,
-  m2 = m2$fitted.values,
-  m3 = m3$fitted.values
+  m1depRS = m1depRS.p$fitted.values,
+  m1PRS = m1PRS.p$fitted.values,
+  m2 = m2.p$fitted.values,
+  m3 = m3.p$fitted.values
 )
 
 mods = c("m1depRS", "m1PRS", "m2", "m3")
@@ -256,25 +252,21 @@ parent = ggroc(list("depRS" = rocs.p$m1depRS, "PRS" = rocs.p$m1PRS, "depRS + PRS
 parent
 ```
 
+# ROC figure
+
 ```{r}
-#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_parent.png", parent, device = "png", create.dir = TRUE, width = 6, height = 4, units = "in")
-```
-
-## ROC figure
-
-```{r eval=FALSE}
 library(patchwork)
 
-ptch_plot = parent + theme(legend.position = "none") + ggtitle("(A)") | youth + ggtitle("(B)")
+ptch_plot = youth + theme(legend.position = "none") + ggtitle("(a)") | parent + ggtitle("(b)")
 ```
 
 ```{r}
-#ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROC_fig.png", ptch_plot, device = "png", create.dir = TRUE, width = 9, height = 4, units = "in")
+ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROCs_sens.png", ptch_plot, device = "png", create.dir = TRUE, width = 9, height = 4, units = "in")
 ```
 
 # Descriptives
 
-## youth
+## Youth self-reported MDD {.tabset}
 
 ```{r}
 y.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_youth$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
@@ -286,20 +278,20 @@ prs_youth = merge(prs_youth, y2age)
 prs_youth = merge(prs_youth, y.base)
 ```
 
-### all
+### Full sample
 
 ```{r}
 summarytools::dfSummary(prs_youth[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
-### case
+### Lifetime MDD \= 1
 
 ```{r}
 prs_youth[,-1] |> filter(mdd_lifetime==1) |> 
 summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
-### control
+### Lifetime MDD \= 0
 
 ```{r}
 prs_youth[,-1] |> filter(mdd_lifetime==0) |> 
@@ -307,7 +299,7 @@ summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.co
 ```
 
 
-## parent
+## Parent-reported MDD {.tabset}
 
 ```{r}
 p.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_parent$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
@@ -319,20 +311,20 @@ prs_parent = merge(prs_parent, y2age)
 prs_parent = merge(prs_parent, p.base)
 ```
 
-### all
+### Full sample
 
 ```{r}
 summarytools::dfSummary(prs_parent[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
-### case
+### Lifetime MDD \= 1
 
 ```{r}
 prs_parent[,-1] |> filter(mdd_lifetime==1) |> 
 summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
-### control
+### Lifetime MDD \= 0
 
 ```{r}
 prs_parent[,-1] |> filter(mdd_lifetime==0) |> 

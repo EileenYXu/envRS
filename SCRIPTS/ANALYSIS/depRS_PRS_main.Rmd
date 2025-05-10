@@ -1,0 +1,333 @@
+---
+title: "depRS and PRS main analyses"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, results = "asis")
+library(tidyverse)
+library(kableExtra)
+library(performance)
+library(pROC)
+library(summarytools)
+define_keywords(title.dfSummary = "NA", ask = F)
+pal = paletteer::paletteer_d("colorblindr::OkabeIto")
+
+set.seed(2025)
+```
+
+This script predicts **binary** lifetime MDD at Year 2 from depRS and MDD PRS from the 2025 PGC GWAS **diverse ancestry sumstats**. PRS for AMR participants were estimated with the EUR ancestry LD matrix. depRS was trained to predict **continuous** CBCL DSM5-oriented depression subscale scores - measured at Year 2 - from 23 environmental factors measured at baseline. depRS and PRS are mean centred and standardised for comparison of ORs.
+
+For (a) self-reported and (b) parent-reported lifetime MDD, we compare the following models:
+
+Single predictor:\
+(m1depRS) Y2 MDD \~ depRS\
+(m1PRS) Y2 MDD \~ PRS\
+
+(m2) Y2 MDD \~ depRS + PRS\
+(m3) Y2 MDD \~ depRS*PRS
+
+
+```{r}
+mdd2025 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/mdd25_prs.rds")
+PRS = bind_rows(mdd2025$afr, mdd2025$eas, mdd2025$amr_diverse, mdd2025$eur_diverse)
+
+depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |>
+  select(src_subject_id, lambda.min)
+
+scores = merge(depRS, PRS, by.x = "src_subject_id", by.y = "IID") |> 
+  mutate(across(where(is.numeric), scale)) |> 
+  mutate(across(where(is.matrix), as.numeric))
+names(scores) = c("src_subject_id", "depRS", "PRS")
+```
+
+depRS was available for N=`r nrow(depRS)` unrelated participants.\
+PRS was available for N=`r nrow(PRS)` participants.\
+
+A total N=`r nrow(scores)` *unrelated* participants had complete depRS and PRS data.
+
+```{r}
+rm(depRS, PRS)
+```
+
+# (a) Youth self-reported MDD
+
+```{r}
+mddy = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_y.rds")
+
+dat.y = merge(scores, mddy$y2[,c("src_subject_id", "mdd_lifetime")], by = "src_subject_id")
+
+dat.y |> summarise(
+  N = n(),
+  LifetimeMDD = sum(mdd_lifetime=="1"),
+  NoMDD = sum(mdd_lifetime=="0")
+) |> kbl(digits = 3)
+
+prs_youth = dat.y |> select(src_subject_id, mdd_lifetime)
+```
+
+Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. 
+
+## Model comparisons {.tabset}
+
+```{r}
+m1depRS.y = glm(mdd_lifetime ~ depRS, dat.y, family = binomial(link = "logit"))
+m1PRS.y = glm(mdd_lifetime ~ PRS, dat.y, family = binomial(link = "logit"))
+
+m2.y = glm(mdd_lifetime ~ depRS + PRS, 
+         dat.y, family = binomial(link = "logit"))
+m3.y = glm(mdd_lifetime ~ depRS*PRS,
+         dat.y, family = binomial(link = "logit"))
+```
+
+### ~ depRS
+
+```{r}
+test_performance(m1depRS.y, m2.y, m3.y) |> display(digits=3)
+```
+
+### ~ PRS
+
+```{r}
+test_performance(m1PRS.y, m2.y, m3.y) |> display(digits=3)
+```
+
+## Performance metrics
+
+```{r}
+mods.y = list(m1depRS.y, m1PRS.y, m2.y, m3.y)
+
+compare_performance(mods.y, verbose = F) |> 
+  mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+
+lapply(mods.y, performance_accuracy) |> 
+  lapply(as.data.frame) |> 
+  bind_rows(.id = "model") |> 
+  mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+```
+
+## Model estimates
+
+```{r}
+sjPlot::tab_model(mods.y, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+```
+
+## ROC curves
+
+```{r}
+#ROC curves for each model
+dat.y = dat.y |> mutate(
+  m1depRS = m1depRS.y$fitted.values,
+  m1PRS = m1PRS.y$fitted.values,
+  m2 = m2.y$fitted.values,
+  m3 = m3.y$fitted.values
+)
+
+mods = c("m1depRS", "m1PRS", "m2", "m3")
+
+rocs.y = list()
+for (m in 1:length(mods.y)) {
+  out = roc(dat.y$mdd_lifetime, dat.y[,mods[m]], 
+            ci = TRUE, auc = TRUE)
+  rocs.y[[mods[m]]] = out
+}
+```
+
+```{r}
+youth = ggroc(list("depRS" = rocs.y$m1depRS, "PRS" = rocs.y$m1PRS, "depRS + PRS" = rocs.y$m2, "depRS*PRS" = rocs.y$m3)) +
+  scale_color_manual(values = pal) +
+  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
+  theme_bw() + 
+  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+
+youth
+
+#par("din")
+```
+
+# (b) Parent-reported MDD
+
+```{r}
+mddp = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/ksads_p.rds")
+
+dat.p = merge(scores, mddp$y2, by = "src_subject_id")
+
+dat.p |> summarise(
+  N = n(),
+  LifetimeMDD = sum(mdd_lifetime=="1"),
+  NoMDD = sum(mdd_lifetime=="0")
+) |> kbl(digits = 3)
+
+prs_parent = dat.p |> select(src_subject_id, mdd_lifetime)
+```
+
+Of the N=`r nrow(dat.p)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.p, mdd_lifetime==1))` lifetime MDD cases.
+
+## Model comparisons {.tabset}
+
+```{r}
+m1depRS.p = glm(mdd_lifetime ~ depRS, dat.p, family = binomial(link = "logit"))
+m1PRS.p = glm(mdd_lifetime ~ PRS, dat.p, family = binomial(link = "logit"))
+
+m2.p = glm(mdd_lifetime ~ depRS + PRS, 
+         dat.p, family = binomial(link = "logit"))
+m3.p = glm(mdd_lifetime ~ depRS*PRS,
+         dat.p, family = binomial(link = "logit"))
+```
+
+### ~ depRS
+
+```{r}
+test_performance(m1depRS.p, m2.p, m3.p) |> display(digits=3)
+```
+
+### ~ PRS
+
+```{r}
+test_performance(m1PRS.p, m2.p, m3.p) |> display(digits=3)
+```
+
+## Performance metrics
+
+```{r}
+mods.p = list(m1depRS.p, m1PRS.p, m2.p, m3.p)
+
+compare_performance(mods.p, verbose = F) |> 
+  mutate(Name = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+
+lapply(mods.p, performance_accuracy) |> 
+  lapply(as.data.frame) |> 
+  bind_rows(.id = "model") |> 
+  mutate(model = c("depRS", "PRS", "depRS+PRS", "depRS*PRS")) |> 
+  kable(digits = 3) |> kable_styling()
+```
+
+## Model estimates
+
+```{r}
+sjPlot::tab_model(mods.p, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+```
+
+## ROC curves
+
+```{r}
+#ROC curves for each model
+dat.p = dat.p |> mutate(
+  m1depRS = m1depRS.p$fitted.values,
+  m1PRS = m1PRS.p$fitted.values,
+  m2 = m2.p$fitted.values,
+  m3 = m3.p$fitted.values
+)
+
+mods = c("m1depRS", "m1PRS", "m2", "m3")
+
+rocs.p = list()
+for (m in 1:length(mods)) {
+  out = roc(dat.p$mdd_lifetime, dat.p[,mods[m]], 
+            ci = TRUE, auc = TRUE)
+  rocs.p[[mods[m]]] = out
+}
+```
+
+
+```{r}
+parent = ggroc(list("depRS" = rocs.p$m1depRS, "PRS" = rocs.p$m1PRS, "depRS + PRS" = rocs.p$m2, "depRS*PRS" = rocs.p$m3)) +
+  scale_color_manual(values = pal) +
+  geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7, linetype = "dashed") +
+  theme_bw() + 
+  labs(x = "Specificity", y = "Sensitivity", color = "Model")
+
+parent
+```
+
+
+# ROC figure
+
+```{r}
+library(patchwork)
+
+ptch_plot = youth + theme(legend.position = "none") + ggtitle("(a)") | parent + ggtitle("(b)")
+```
+
+```{r}
+ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROCs_main.png", ptch_plot, device = "png", create.dir = TRUE, width = 9, height = 4, units = "in")
+```
+
+# Descriptives
+
+## (a) Youth self-reported MDD {.tabset}
+
+```{r}
+y.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_youth$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+
+y2age = y.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
+y.base = y.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
+
+prs_youth = merge(prs_youth, y2age)
+prs_youth = merge(prs_youth, y.base)
+```
+
+### Full sample
+
+```{r}
+summarytools::dfSummary(prs_youth[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### Lifetime MDD \= 1
+
+```{r}
+prs_youth[,-1] |> filter(mdd_lifetime==1) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### Lifetime MDD \= 0
+
+```{r}
+prs_youth[,-1] |> filter(mdd_lifetime==0) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+
+## Parent-reported MDD {.tabset}
+
+```{r}
+p.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_parent$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+
+y2age = p.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
+p.base = p.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
+
+prs_parent = merge(prs_parent, y2age)
+prs_parent = merge(prs_parent, p.base)
+```
+
+### Full sample
+
+```{r}
+summarytools::dfSummary(prs_parent[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### Lifetime MDD \= 1
+
+```{r}
+prs_parent[,-1] |> filter(mdd_lifetime==1) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
+
+### Lifetime MDD \= 0
+
+```{r}
+prs_parent[,-1] |> filter(mdd_lifetime==0) |> 
+summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+```
