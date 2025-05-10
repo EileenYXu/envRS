@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 ABCD-risk-factors-collated.xlsx
-**/.html
-**/.csv
+**/*.html
+**/*.csv
