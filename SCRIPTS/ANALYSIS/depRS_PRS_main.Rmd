@@ -22,6 +22,8 @@ library(summarytools)
 define_keywords(title.dfSummary = "NA", ask = F)
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 
+source("C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/summarystats.R")
+
 set.seed(2025)
 ```
 
@@ -39,6 +41,13 @@ Single predictor:\
 
 ```{r}
 mdd2025 = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/mdd25_prs.rds")
+
+for (anc in 1:length(mdd2025)) {
+  ancestry = names(mdd2025)[anc]
+  val = rep(ancestry, times = nrow(mdd2025[[anc]]))
+  mdd2025[[anc]]$ancestry = as.factor(val)
+}
+
 PRS = bind_rows(mdd2025$afr, mdd2025$eas, mdd2025$amr_diverse, mdd2025$eur_diverse)
 
 depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |>
@@ -47,7 +56,7 @@ depRS = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dep
 scores = merge(depRS, PRS, by.x = "src_subject_id", by.y = "IID") |> 
   mutate(across(where(is.numeric), scale)) |> 
   mutate(across(where(is.matrix), as.numeric))
-names(scores) = c("src_subject_id", "depRS", "PRS")
+names(scores)[2:3] = c("depRS", "PRS")
 ```
 
 depRS was available for N=`r nrow(depRS)` unrelated participants.\
@@ -72,7 +81,7 @@ dat.y |> summarise(
   NoMDD = sum(mdd_lifetime=="0")
 ) |> kbl(digits = 3)
 
-prs_youth = dat.y |> select(src_subject_id, mdd_lifetime)
+prs_youth = dat.y |> select(src_subject_id, mdd_lifetime, ancestry)
 ```
 
 Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.y, mdd_lifetime==1))` lifetime MDD cases. 
@@ -81,11 +90,11 @@ Of the N=`r nrow(dat.y)` participants with self-reported MDD data at year 2, the
 
 ```{r}
 m1depRS.y = glm(mdd_lifetime ~ depRS, dat.y, family = binomial(link = "logit"))
-m1PRS.y = glm(mdd_lifetime ~ PRS, dat.y, family = binomial(link = "logit"))
+m1PRS.y = glm(mdd_lifetime ~ PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG, dat.y, family = binomial(link = "logit"))
 
-m2.y = glm(mdd_lifetime ~ depRS + PRS, 
+m2.y = glm(mdd_lifetime ~ depRS + PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG, 
          dat.y, family = binomial(link = "logit"))
-m3.y = glm(mdd_lifetime ~ depRS*PRS,
+m3.y = glm(mdd_lifetime ~ depRS*PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG,
          dat.y, family = binomial(link = "logit"))
 ```
 
@@ -120,7 +129,7 @@ lapply(mods.y, performance_accuracy) |>
 ## Model estimates
 
 ```{r}
-sjPlot::tab_model(mods.y, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+sjPlot::tab_model(mods.y, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T, terms = c("depRS", "PRS", "depRS:PRS"))
 ```
 
 ## ROC curves
@@ -153,7 +162,7 @@ youth = ggroc(list("depRS" = rocs.y$m1depRS, "PRS" = rocs.y$m1PRS, "depRS + PRS"
 
 youth
 
-#par("din")
+saveRDS(youth, "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/main_roc_youth.rds")
 ```
 
 # (b) Parent-reported MDD
@@ -169,7 +178,7 @@ dat.p |> summarise(
   NoMDD = sum(mdd_lifetime=="0")
 ) |> kbl(digits = 3)
 
-prs_parent = dat.p |> select(src_subject_id, mdd_lifetime)
+prs_parent = dat.p |> select(src_subject_id, mdd_lifetime, ancestry)
 ```
 
 Of the N=`r nrow(dat.p)` participants with self-reported MDD data at year 2, there were N=`r nrow(filter(dat.p, mdd_lifetime==1))` lifetime MDD cases.
@@ -178,11 +187,11 @@ Of the N=`r nrow(dat.p)` participants with self-reported MDD data at year 2, the
 
 ```{r}
 m1depRS.p = glm(mdd_lifetime ~ depRS, dat.p, family = binomial(link = "logit"))
-m1PRS.p = glm(mdd_lifetime ~ PRS, dat.p, family = binomial(link = "logit"))
+m1PRS.p = glm(mdd_lifetime ~ PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG, dat.p, family = binomial(link = "logit"))
 
-m2.p = glm(mdd_lifetime ~ depRS + PRS, 
+m2.p = glm(mdd_lifetime ~ depRS + PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG, 
          dat.p, family = binomial(link = "logit"))
-m3.p = glm(mdd_lifetime ~ depRS*PRS,
+m3.p = glm(mdd_lifetime ~ depRS*PRS + PC1_AVG + PC2_AVG + PC3_AVG + PC4_AVG + PC5_AVG,
          dat.p, family = binomial(link = "logit"))
 ```
 
@@ -217,7 +226,7 @@ lapply(mods.p, performance_accuracy) |>
 ## Model estimates
 
 ```{r}
-sjPlot::tab_model(mods.p, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T)
+sjPlot::tab_model(mods.p, dv.labels = c("depRS", "PRS", "depRS+PRS", "depRS*PRS"), collapse.ci = T, show.se = T, show.stat = T, terms = c("depRS", "PRS", "depRS:PRS"))
 ```
 
 ## ROC curves
@@ -250,27 +259,17 @@ parent = ggroc(list("depRS" = rocs.p$m1depRS, "PRS" = rocs.p$m1PRS, "depRS + PRS
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
 
 parent
+
+saveRDS(parent, "C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/main_roc_parent.rds")
 ```
 
-
-# ROC figure
-
-```{r}
-library(patchwork)
-
-ptch_plot = youth + theme(legend.position = "none") + ggtitle("(a)") | parent + ggtitle("(b)")
-```
-
-```{r}
-ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ROCs_main.png", ptch_plot, device = "png", create.dir = TRUE, width = 9, height = 4, units = "in")
-```
 
 # Descriptives
 
 ## (a) Youth self-reported MDD {.tabset}
 
 ```{r}
-y.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_youth$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+y.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_youth$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed) |> mutate(income = as.factor(income))
 
 y2age = y.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
 y.base = y.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
@@ -278,6 +277,14 @@ y.base = y.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs =
 prs_youth = merge(prs_youth, y2age)
 prs_youth = merge(prs_youth, y.base)
 ```
+
+```{r}
+sumcols = c("age_yrs", "y2_age", "gender_id", "birthsex", "race_ethnicity", "income", "parent_ed", "ancestry", "mdd_lifetime")
+all_y_sum = get_sum_stats(df = prs_youth, vars = sumcols)
+case_y_sum = prs_youth |> filter(mdd_lifetime==0) |> get_sum_stats( vars = sumcols)
+ctrl_y_sum = prs_youth |> filter(mdd_lifetime==0) |> get_sum_stats( vars = sumcols)
+```
+
 
 ### Full sample
 
@@ -300,10 +307,10 @@ summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.co
 ```
 
 
-## Parent-reported MDD {.tabset}
+## (b) Parent-reported MDD {.tabset}
 
 ```{r}
-p.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_parent$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed)
+p.dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds") |> filter(src_subject_id %in% prs_parent$src_subject_id) |> select(src_subject_id, eventname, interview_age, gender_id, birthsex, race_ethnicity, income, parent_ed) |> mutate(income = as.factor(income))
 
 y2age = p.dat |> filter(eventname == "2_year_follow_up_y_arm_1") |> mutate(y2_age = interview_age/12) |> select(src_subject_id, y2_age)
 p.base = p.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs = interview_age/12)
@@ -311,6 +318,20 @@ p.base = p.dat |> filter(eventname=="baseline_year_1_arm_1") |> mutate(age_yrs =
 prs_parent = merge(prs_parent, y2age)
 prs_parent = merge(prs_parent, p.base)
 ```
+
+```{r}
+sumcols = c("age_yrs", "y2_age", "gender_id", "birthsex", "race_ethnicity", "income", "parent_ed", "ancestry", "mdd_lifetime")
+all_p_sum = get_sum_stats(df = prs_parent, vars = sumcols)
+case_p_sum = prs_parent |> filter(mdd_lifetime==1) |> get_sum_stats( vars = sumcols)
+ctrl_p_sum = prs_parent |> filter(mdd_lifetime==0) |> get_sum_stats( vars = sumcols)
+```
+
+```{r}
+descriptives = list("youth_all" = all_y_sum,"youth_case" = case_y_sum, "youth_ctrl" = ctrl_y_sum, "parent_all" = all_p_sum, "parent_case" = case_p_sum, "parent_ctrl" = ctrl_p_sum)
+
+openxlsx::write.xlsx(descriptives, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/MDD_PRS_DESC.xlsx")
+```
+
 
 ### Full sample
 
