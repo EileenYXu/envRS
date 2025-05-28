@@ -10,270 +10,90 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(pROC)
+library(patchwork)
 ```
 
-### concurrent models at baseline and y2
+## Figure 2 
+
+### Coefficients
 
 ```{r}
-base_coef = read.csv("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Results/base_coefs.csv")
-y2_coef = read.csv("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Results/y2_coefs.csv")
+coefs = openxlsx::read.xlsx("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/envRS_coefs_long.xlsx", sheet = "all_coefs") |> select(preds, depRS)
 
-dep = merge(base_coef[,2:3], y2_coef[,2:3], by = "preds", all = T)[-1,]
-names(dep) = c("pred", "base", "y2")
+top10 = coefs[-1,] |> arrange(desc(abs(depRS))) |> slice_head(n = 10)
+
+plotlabs = c("Parental depression", "Physical abuse", "Emotional abuse", "Witnessed violence \n in the community", "Witnessed DV", "Dieting", "Hours of sleep", "Sexual abuse", "Serious accident", "Tried tobacco")
+top10$labs = plotlabs
 ```
 
-```{r}
-dep |> arrange(desc(abs(base))) |> head()
-dep |> arrange(desc(abs(y2))) |> head()
 
-coef0.1 = dep |> filter(abs(base)>=0.1|abs(y2)>=0.1) |> arrange(pred)
+```{r}
+opt1 = ggplot(top10, aes(x = depRS, y = fct_rev(labs), label = round(depRS, 2))) +
+  geom_point(aes(size = abs(depRS), colour = depRS)) +
+  geom_vline(xintercept = 0, alpha = 0.3, linetype = "dashed") +
+  scale_size_binned_area(max_size = 8, guide = NULL) +
+  scale_colour_gradient2(name = "Coefficient", 
+                       low = "#2166AC", high = "#B2182B", guide = NULL) +
+  scale_y_discrete(name = NULL) +
+  scale_x_continuous(name = "Std. \U03b2 coefficient", limits = c(-0.22, 0.35), n.breaks = 6) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 10), legend.title = element_text(size=9)) +
+  coord_fixed(0.15)
 ```
 
+
 ```{r}
-plt = pivot_longer(coef0.1, cols = c("base", "y2"), names_to = "data", 
-             values_to = "coefs") |> 
-  ggplot(aes(x = data, y = fct_rev(pred), fill = coefs, label = round(coefs, 2))) +
+opt2 = ggplot(top10, aes(x = "", y = fct_rev(labs), fill = depRS, label = round(depRS, 2))) +
   
   geom_tile(color = "white", lwd = 0.5, linetype = 1) +
   
   geom_text(aes(color = after_scale(
     prismatic::best_contrast(fill, c("white", "black"))
   )),
-  size = 12, size.unit = "pt") +
+  size = 10, size.unit = "pt") +
   
-  scale_fill_gradient2(name = "Std. \u03B2", 
+  scale_fill_gradient2(name = "Std. \U03b2\nCoefficient", 
                        low = "#2166AC", high = "#B2182B",
                        na.value = "grey") +
   
-  scale_y_discrete(name = NULL, labels = c(
-    "eff_control" = "Effortful control", 
-    "emot_abuse" = "Emotional abuse",
-    "life_events" = "Unpredictable \n life events",
-    "needed_food" = "Needed food",
-    "p_abuse" = "Physical abuse",
-    "p_depression" = "Parental depression",
-    "s_abuse" = "Sexual abuse",
-    "serious_accident" = "Serious accident/injury",
-    "sleep_hrs" = "Hours of sleep",
-    "tobacco_puff" = "Tried smoking",
-    "weightcontrol_ksads" = "Dieting",
-    "witness_comm_violence" = "Witnessed \n community violence",
-    "witness_dv" = "Witnessed \n domestic violence"
-  ), expand = c(0,0)) +
-  scale_x_discrete(name = NULL, labels = c(
-    "base" = "Baseline",
-    "y2" = "Y2"
-  ), expand = c(0,0)) +
-  theme(panel.grid = element_blank(), 
+  scale_x_discrete(name = NULL, guide = NULL, expand = c(0,0)) +
+  
+  scale_y_discrete(name = NULL, expand = c(0,0)) +
+  
+  coord_fixed(0.6) +
+  
+    theme(panel.grid = element_blank(), 
         panel.background = element_blank(), 
-        axis.text = element_text(size = 12), 
-        legend.title = element_text(size=12),
+        axis.text = element_text(size = 10), 
+        legend.title = element_text(size=10),
         plot.margin = unit(c(5,5,5,5), "pt"))
 ```
 
+### ROCs
+
 ```{r}
-ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/ALL_Coefs_concurrent.png", plt, device = "png")
+parent = readRDS("./SCRIPTS/main_roc_parent.rds")
+youth = readRDS("./SCRIPTS/main_roc_youth.rds")
 ```
 
-
-## Cross-sectional vs longitudinal predictors
+### Piece together
 
 ```{r}
-long = read.csv("C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_coefs.csv")
-long = long[-1,-1]
-names(long) = c("Predictor", "depRS_long", "intRS_long")
-cross = read.csv("C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/base_coefs.csv")
-cross = cross[-1,-1]
-names(cross) = c("Predictor", "depRS_cross", "intRS_cross")
+c.plot = opt1 + ggtitle("A")
+p.plot = parent + ggtitle("B")
+y.plot = youth + ggtitle("C")
 
-coefs = merge(long, cross, by = "Predictor")
-
-dep_all = coefs |> select(Predictor, depRS_long, depRS_cross) |> 
-  pivot_longer(cols = c("depRS_long", "depRS_cross"),
-               names_to = "model")
-dep_all = dep_all |> mutate(
-  model = case_when(model=="depRS_long" ~ "Year 2",
-                    model=="depRS_cross" ~ "Baseline")
-)
-
-dep = coefs |> 
-  filter(abs(depRS_long)>=0.1|abs(depRS_cross)>=0.1) |>
-  select(Predictor, depRS_long, depRS_cross) |> 
-  pivot_longer(cols = c("depRS_long", "depRS_cross"),
-               names_to = "model")
-dep = dep |> mutate(
-  model = case_when(model=="depRS_long" ~ "Year 2",
-                    model=="depRS_cross" ~ "Baseline")
-)
-
-preds_dep = coefs |> filter(abs(depRS_long)>=0.1|abs(depRS_cross)>=0.1)
-preds_int = coefs |> filter(abs(intRS_long)>=0.1|abs(intRS_cross)>=0.1)
+option1 = (c.plot + (p.plot / y.plot + plot_layout(guides = "collect")))
+ggsave(plot = option1, filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures and Tables/fig2_opt1.png",
+height = 5, width = 7)
 ```
 
 ```{r}
-plt = dep |> 
-  ggplot(aes(x = model, y = Predictor, fill = value, label = round(value, 2))) +
-  
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
-  
-  geom_text(aes(color = after_scale(
-    prismatic::best_contrast(fill, c("white", "black"))
-  )),
-  size = 12, size.unit = "pt") +
-  
-  scale_fill_gradient2(name = "Std. \u03B2", 
-                       low = "#2166AC", high = "#B2182B",
-                       na.value = "grey") +
-  
-  scale_y_discrete(name = NULL,
-                   limits = rev(c("weightcontrol_ksads", "emot_abuse",
-                              "sleep_hrs", "p_depression", "p_abuse",
-                              "serious_accident", "s_abuse",
-                              "tobacco_puff",
-                              "witness_comm_violence", "witness_dv")), 
-                   labels = c(
-    "emot_abuse" = "Emotional abuse",
-    "p_abuse" = "Physical abuse",
-    "p_depression" = "Parental depression",
-    "s_abuse" = "Sexual abuse",
-    "serious_accident" = "Serious accident/injury",
-    "sleep_hrs" = "Hours of sleep",
-    "tobacco_puff" = "Tried smoking",
-    "weightcontrol_ksads" = "Dieting",
-    "witness_comm_violence" = "Witnessed \n community violence",
-    "witness_dv" = "Witnessed \n domestic violence"
-  ), expand = c(0,0)) +
-  scale_x_discrete(name = NULL, expand = c(0,0)) +
-  theme(panel.grid = element_blank(), 
-        panel.background = element_blank(), 
-        axis.text = element_text(size = 12), 
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=12),
-        plot.margin = unit(c(8,8,8,8), "pt"))
+c2.plot = opt2 + ggtitle("A")
+
+option2 = c2.plot + (p.plot / y.plot + plot_layout(guides = "collect"))
+ggsave(plot = option2, filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures and Tables/fig2_opt2.png", 
+      height = 5, width = 7)
 ```
 
-```{r}
-ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/Baseline_Preds_DEP.png", plt, device = "png", create.dir = TRUE, width = 6, height = 6, units = "in")
-```
-
-### all coefficients
-
-```{r}
-plt = dep_all |> 
-  ggplot(aes(x = model, y = Predictor, fill = value, label = round(value, 2))) +
-  
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
-  
-  geom_text(aes(color = after_scale(
-    prismatic::best_contrast(fill, c("white", "black"))
-  )),
-  size = 12, size.unit = "pt") +
-  
-  scale_fill_gradient2(name = "Std. \u03B2", 
-                       low = "#2166AC", high = "#B2182B",
-                       na.value = "grey") +
-  
-  scale_y_discrete(name = NULL, limits = rev(levels(as.factor(dep_all$Predictor))),
-                   labels = c(
-    "agemths" = "Age (months)",
-    "area_depriv" = "Area deprivation",
-    "bmi" = "BMI",
-    "comm_safety" = "Community safety",
-    "days_active" = "Physical activity",
-    "death_loved_one" = "Death of a \n loved one",
-    "emot_abuse" = "Emotional abuse",
-    "fam_conflict" = "Family conflict",
-    "gender" = "Gender identity",
-    "income" = "Household income",
-    "needed_food" = "Needed food",
-    "p_acceptance" = "Parental acceptance",
-    "p_abuse" = "Physical abuse",
-    "p_depression" = "Parental depression",
-    "p_monitoring" = "Parental monitoring",
-    "parent_ed" = "Parental education",
-    "s_abuse" = "Sexual abuse",
-    "serious_accident" = "Serious accident/injury",
-    "sleep_hrs" = "Hours of sleep",
-    "tobacco_puff" = "Tried smoking",
-    "weightcontrol_ksads" = "Dieting",
-    "witness_comm_violence" = "Witnessed \n community violence",
-    "witness_dv" = "Witnessed \n domestic violence"
-  ), expand = c(0,0)) +
-  scale_x_discrete(name = NULL, expand = c(0,0)) +
-  theme(panel.grid = element_blank(), 
-        panel.background = element_blank(), 
-        axis.text = element_text(size = 12), 
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=12),
-        plot.margin = unit(c(8,8,8,8), "pt"))
-```
-
-```{r}
-ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/Baseline_ALL_DEP.png", plt, device = "png", create.dir = TRUE, width = 6, height = 12, units = "in")
-```
-
-
-```{r}
-int = coefs |> 
-  filter(abs(intRS_long)>=0.1|abs(intRS_cross)>=0.1) |>
-  select(Predictor, intRS_long, intRS_cross) |> 
-  pivot_longer(cols = c("intRS_long", "intRS_cross"),
-               names_to = "model")
-int = int |> mutate(
-  model = case_when(model=="intRS_long" ~ "Year 2",
-                    model=="intRS_cross" ~ "Baseline")
-)
-
-
-preds_int = coefs |> filter(abs(intRS_long)>=0.1|abs(intRS_cross)>=0.1)
-```
-
-```{r}
-plt = int |> 
-  ggplot(aes(x = model, y = Predictor, fill = value, label = round(value, 2))) +
-  
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
-  
-  geom_text(aes(color = after_scale(
-    prismatic::best_contrast(fill, c("white", "black"))
-  )),
-  size = 12, size.unit = "pt") +
-  
-  scale_fill_gradient2(name = "Std. \u03B2", 
-                       low = "#2166AC", high = "#B2182B",
-                       na.value = "grey") +
-  
-  scale_y_discrete(name = NULL,
-                   limits = rev(c("death_loved_one",
-                                  "weightcontrol_ksads",
-                                  "emot_abuse", "gender",
-                                  "p_depression", "p_abuse",
-                              "serious_accident", "s_abuse",
-                              "tobacco_puff",
-                              "witness_comm_violence", "witness_dv")), 
-                   labels = c(
-    "death_loved_one" = "Death of a \n loved one",
-    "emot_abuse" = "Emotional abuse",
-    "gender" = "Gender identity",
-    "p_abuse" = "Physical abuse",
-    "p_depression" = "Parental depression",
-    "s_abuse" = "Sexual abuse",
-    "serious_accident" = "Serious accident/injury",
-    "tobacco_puff" = "Tried smoking",
-    "weightcontrol_ksads" = "Dieting",
-    "witness_comm_violence" = "Witnessed \n community violence",
-    "witness_dv" = "Witnessed \n domestic violence"
-  ), expand = c(0,0)) +
-  scale_x_discrete(name = NULL, expand = c(0,0)) +
-  theme(panel.grid = element_blank(), 
-        panel.background = element_blank(), 
-        axis.text = element_text(size = 12), 
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=12),
-        plot.margin = unit(c(8,8,8,8), "pt"))
-```
-
-
-```{r}
-ggsave("C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures/Baseline_Preds_INT.png", plt, device = "png", create.dir = TRUE, width = 6, height = 7, units = "in")
-```

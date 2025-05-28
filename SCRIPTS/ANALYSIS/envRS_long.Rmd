@@ -19,6 +19,8 @@ library(RColorBrewer)
 library(glmnet)
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 set.seed(2024)
+
+source("summarystats.R")
 ```
 
 # Elastic net linear regression using 'glmnet'
@@ -28,7 +30,7 @@ Model predicting year 2 CBCL using environmental factors measured at baseline.
 ## Data prep
 
 ```{r}
-dat = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
+dat = readRDS("/exports/igmm/datastore/GenScotDepression/users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/predictors_unrelatedIDs.rds")
 
 y2CBCL = dat |> filter(eventname=="2_year_follow_up_y_arm_1") |> select(src_subject_id, interview_age, cbcl_scr_dsm5_depress_r, cbcl_scr_syn_internal_r) |> drop_na(cbcl_scr_dsm5_depress_r, cbcl_scr_dsm5_depress_r) |> 
   mutate(y2_age = interview_age/12) |> select(-interview_age)
@@ -181,7 +183,7 @@ depRS_test = data.frame(
 
 depRS = rbind(depRS_train, depRS_test)
 
-saveRDS(depRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds")
+saveRDS(depRS, "/exports/igmm/datastore/GenScotDepression/users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds")
 ```
 
 ```{r}
@@ -276,7 +278,7 @@ intRS_test = data.frame(
 
 intRS = rbind(intRS_train, intRS_test)
 
-saveRDS(intRS, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_long.rds")
+saveRDS(intRS, "/exports/igmm/datastore/GenScotDepression/users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/intRS_long.rds")
 ```
 
 ```{r}
@@ -305,8 +307,6 @@ base_coefs = merge(depcoef, intcoef)
 
 # make row names the first column
 base_coefs = base_coefs
-
-write.csv(base_coefs, "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_coefs.csv")
 ```
 
 ```{r}
@@ -318,7 +318,9 @@ base_coefs_sig = coef_long |> filter(abs(round(beta.min, 3))!=0)
 ## pivot this back to wide
 coefs_sig = base_coefs_sig |> pivot_wider(names_from = out, values_from = beta.min)
 
-write.csv(coefs_sig, "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_coefs_sig.csv")
+coefs = list(base_coefs, base_coefs_sig)
+
+openxlsx::write.xlsx(coefs, file = "/exports/igmm/datastore/GenScotDepressionusers/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/envRS_coefs_long.xlsx")
 ```
 
 ```{r fig.height=15, fig.width=10}
@@ -330,7 +332,7 @@ ggplot(base_coefs_sig, aes(x = out, y = preds, fill = beta.min)) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
 
-ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_coefs_sig.svg", height = 200, width = 200, units = "mm")
+#ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_coefs_sig.svg", height = 200, width = 200, units = "mm")
 ```
 
 ## CBCL depression
@@ -364,7 +366,7 @@ ggplot(coef_01, aes(x = out, y = preds, fill = beta.min)) +
   theme(panel.grid = element_blank(), panel.background = element_blank(), 
         axis.text = element_text(size = 12), legend.title = element_text(size=12))
 
-ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_01.svg", height = 140, width = 200, units = "mm")
+#ggsave(filename = "C://Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/OUTPUT/long_01.svg", height = 140, width = 200, units = "mm")
 ```
 
 ## CBCL depression
@@ -417,7 +419,13 @@ corrplot::corrplot.mixed(sig.level = 0.05, upper = "color", lower = "number", or
 
 ```{r}
 #get age in years
-sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = interview_age/12)})
+sumdat = lapply(sumdat, function(x) {mutate(x, age_yrs = interview_age/12, income = as.factor(income))})
+sumcols = names(sumdat$whole[,-1])
+all_sum = get_sum_stats(df = sumdat$whole, vars = sumcols)
+train_sum = get_sum_stats(df = sumdat$train, vars = sumcols)
+test_sum = get_sum_stats(df = sumdat$test, vars = sumcols)
+summaries = list(all_sum, train_sum, test_sum)
+openxlsx::write.xlsx(summaries, "/exports/igmm/datastore/GenScotDepressionusers/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/OUTPUT/descriptives_long.xlsx")
 ```
 
 ## Whole sample
