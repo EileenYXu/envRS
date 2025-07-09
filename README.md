@@ -1,5 +1,7 @@
 ## Longitudinal Prediction of Adolescent Depression From Environmental and Polygenic Risk Scores
 
+**[Now available as a pre-print on medRxiv](https://www.medrxiv.org/content/10.1101/2025.07.08.25331098v1)**
+
 **Aim**: To develop a model predicting adolescent depression symptoms (depRS) from a review of environmental risk factors and assess depRS prediction of lifetime depression at 2-year follow-up compared to polygenic risk scores (PRS). 
 
 ### ./SCRIPTS/
