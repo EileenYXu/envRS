@@ -16,6 +16,8 @@ y2_age = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/pr
 
 fullsamp = merge(baseline, y2_age, by = "src_subject_id", all.x = T)
 
+depRS_ids = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/EN_ids.rds")
+
 #in long depRS
 longsamp = readRDS("G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/depRS_long.rds") |> select(src_subject_id)
 
@@ -66,7 +68,11 @@ fullsamp = fullsamp |> mutate(
   in_depRS_long = ifelse(src_subject_id %in% longsamp$src_subject_id, 1, 0),
   in_depRS_cross = ifelse(src_subject_id %in% crosssamp$src_subject_id, 1, 0),
   in_PRS_y = ifelse(src_subject_id %in% dat.y$IID, 1, 0),
-  in_PRS_p = ifelse(src_subject_id %in% dat.p$IID, 1, 0)
+  in_PRS_p = ifelse(src_subject_id %in% dat.p$IID, 1, 0),
+  in_train_long = ifelse(src_subject_id %in% depRS_ids$long_train, 1, 0),
+  in_test_long = ifelse(src_subject_id %in% depRS_ids$long_test, 1, 0),
+  in_train_cross = ifelse(src_subject_id %in% depRS_ids$cross_train, 1, 0),
+  in_test_cross = ifelse(src_subject_id %in% depRS_ids$cross_test, 1, 0)
 )
 
 fullsamp = fullsamp |> relocate(age_y2, .after = age_base)
@@ -85,9 +91,20 @@ for (s in samps) {
   descriptives[[str_remove(s, "in_")]] = merge(indat, exdat, by = "Var", sort = F)
 }
 
+#openxlsx::write.xlsx(descriptives, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Descriptives/ALL_EXCLUDED_DESC.xlsx")
 
-openxlsx::write.xlsx(descriptives, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Descriptives/ALL_EXCLUDED_DESC.xlsx")
 
+depRS_samps = c("in_train_long", "in_test_long", "in_train_cross", "in_test_cross")
+
+depRS_desc = data.frame("Var" = descriptives$depRS_long$Var)
+
+for (s in depRS_samps) {
+  tmpdat = fullsamp |> filter(!!sym(s) == 1) |> get_sum_stats(vars = desc_env)
+  names(tmpdat)[3] = paste0(s, "_", tmpdat[1,2])
+  depRS_desc = merge(depRS_desc, tmpdat[,-2], by = "Var", sort = F)
+}
+
+write.csv(depRS_desc, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Descriptives/train_test_samps.csv")
 
 ########### by lifetime MDD status ##################
 mdds = c(case = "1", ctrl = "0", miss = NA_character_)

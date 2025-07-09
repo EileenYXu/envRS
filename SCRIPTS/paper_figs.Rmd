@@ -87,6 +87,8 @@ y.plot = youth + ggtitle("C")
 option1 = (c.plot + (p.plot / y.plot + plot_layout(guides = "collect")))
 ggsave(plot = option1, filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures and Tables/fig2_opt1.png",
 height = 5, width = 7)
+ggsave(plot = option1, filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures and Tables/fig2.svg", 
+      height = 5, width = 7)
 ```
 
 ```{r}
@@ -95,5 +97,6 @@ c2.plot = opt2 + ggtitle("A")
 option2 = c2.plot + (p.plot / y.plot + plot_layout(guides = "collect"))
 ggsave(plot = option2, filename = "C://Users/eilee/Desktop/PhD/Year 3/Drafts/envRS_paper/Figures and Tables/fig2_opt2.png", 
       height = 5, width = 7)
+
 ```
 

@@ -20,7 +20,7 @@ library(kableExtra)
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 set.seed(2024)
 
-source("summarystats.R")
+source("../summarystats.R")
 ```
 
 # Elastic net linear regression using 'glmnet'
@@ -29,7 +29,7 @@ Predictors identified from quantitative reviews of adolescent MDD risk factors i
 
 ```{r}
 ## read in data, exclude individuals identifying as GNC (too few for meaningful effect from interaction I think)
-dat = readRDS("/exports/igmm/datastore/GenScotDepressionusers/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_baseline.rds") |> filter(gender != "GNC") |> droplevels()
+dat = readRDS("/exports/igmm/datastore/GenScotDepression/users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/dat_baseline.rds") |> filter(gender != "GNC") |> droplevels()
 
 ## split into train and test samples 
 index = caret::createDataPartition(dat$cbcl_dsm5_depress, p = 0.2,
