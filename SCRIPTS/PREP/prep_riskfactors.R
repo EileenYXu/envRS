@@ -74,11 +74,6 @@ ksads[,3:ncol(ksads)] = lapply(ksads[,3:ncol(ksads)], as.factor)
 summary(ksads)
 rm(diet, ptsd)
 
-#### neglect scale - not available at baseline or y2 ####
-
-#neglect = read.csv("G://data/abcd/release5.1/core/culture-environment/ce_y_mnbs.csv")
-#neglect = neglect |> select(src_subject_id, eventname, mnbs_ss_mean_all)
-
 #### bkfs ####
 bkfs = read.csv("G://data/abcd/release5.1/core/physical-health/ph_p_bkfs.csv")
 bkfs = bkfs |> select(src_subject_id, eventname, bkfs_fruit_ce, bkfs_vegnopot_ce, bkfs_dt_fibe)
