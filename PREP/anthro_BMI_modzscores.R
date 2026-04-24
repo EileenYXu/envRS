@@ -60,9 +60,9 @@ for (ppt in 1:nrow(abcd)) {
   dat = rbind(dat, datppt)
 }
 
-agemths = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_y_lt.csv")
+agemths = read.csv("abcdv5.1/abcd-general/abcd_y_lt.csv")
 agemths = agemths %>% select(src_subject_id, eventname, interview_age)
-demog = read.csv("G://data/abcd/release5.1/core/abcd-general/abcd_p_demo.csv")
+demog = read.csv("abcdv5.1/abcd-general/abcd_p_demo.csv")
 demog = demog %>% filter(eventname=="baseline_year_1_arm_1") %>% select(src_subject_id, demo_sex_v2)
 
 abcd = merge(dat, agemths, by = c("src_subject_id", "eventname"), all.x = T)
@@ -115,4 +115,4 @@ modscores %>% select(src_subject_id, age_yr, wt, ht, bmi, sex, mod_bmiz, biv, bi
 # difference between +9 and +10
 modscores %>% select(src_subject_id, age_yr, wt, ht, bmi, sex, mod_bmiz, biv, biv_9SD, biv_10SD) %>% filter(biv_9SD=="high biv" & biv_10SD=="plausible")
 
-#write.csv(modscores, "G://users/eileen/ABCD/ABCD_Environmental_Risk/ABCDv5.1/DATA/BMI_modified_z.csv")
+#write.csv(modscores, "DATA/BMI_modified_z.csv")

@@ -1,6 +1,10 @@
-library(tidyverse)
+#############################################################################
+#### Script for building dataset of depRS predictors from ABCD v5.1 data ####
+#############################################################################
 
-get95 = function(var){quantile(var, probs=0.95, na.rm=T)}
+
+
+library(tidyverse)
 
 #### tlfb: alcohol, cannabis, polydrug use ####
 
@@ -267,7 +271,7 @@ rm(dfs)
 rel_id = read.csv("abcdv5.1/abcd-general/abcd_y_lt.csv")
 dat = merge(dat, rel_id, by=c("src_subject_id", "eventname"), all.x=T)
 
-#### randomly select one individual from each family ####
+#### randomly select one individual from each family, save IDlist ####
 #set.seed(2024)
 
 #famids_base = dat |> filter(eventname=="baseline_year_1_arm_1") |> select(src_subject_id, rel_family_id)
@@ -322,10 +326,7 @@ y_ksads = y_ksads |> mutate(
 
 y_ksads_event = list(
   base = y_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
-  y1 = y_ksads |> filter(eventname=="1_year_follow_up_y_arm_1") |> na.omit(),
-  y2 = y_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit(),
-  y3 = y_ksads |> filter(eventname=="3_year_follow_up_y_arm_1") |> na.omit(),
-  y4 = y_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
+  y2 = y_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit()
 )
 
 saveRDS(y_ksads_event, "DATA/ksads_y.rds")
@@ -354,10 +355,7 @@ p_ksads = p_ksads |> mutate(
 
 p_ksads_event = list(
   base = p_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
-  y1 = p_ksads |> filter(eventname=="1_year_follow_up_y_arm_1") |> na.omit(),
-  y2 = p_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit(),
-  y3 = p_ksads |> filter(eventname=="3_year_follow_up_y_arm_1") |> na.omit(),
-  y4 = p_ksads |> filter(eventname=="4_year_follow_up_y_arm_1") |> na.omit()
+  y2 = p_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit()
 )
 
 saveRDS(p_ksads_event, "DATA/ksads_p.rds")
