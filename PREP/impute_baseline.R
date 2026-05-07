@@ -76,17 +76,14 @@ pred["area_depriv", c("site_id_l", "income", "parent_ed", "race_ethnicity")] = c
 base$site_id_l = as.integer(base$site_id_l)
 
 # impute 50 datasets ----
-base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 10)
+base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 50)
 
 # check for convergence ----
 svg("PLOTS/base_imp_tracelines.svg", height = 50)
 plot(base_imp, layout = c(2, 30))
 dev.off()
 
-#save(base_imp, file = "DATA/baseline_imputed.RData")
-
-imp1 = complete(base_imp, action = 1)
-save(imp1, file = "DATA/baseline_imp1.RData")
+save(base_imp, file = "DATA/baseline_imputed.RData")
 
 imp_dfs = lapply(1:50, function (i) complete(base_imp, action = i))
-save(imp_dfs, file = "DATA/baseline_stacked.RData")
+save(imp_dfs, file = "DATA/baseline_dfs.RData")
