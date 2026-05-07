@@ -20,10 +20,11 @@ base = dat |> filter(eventname=="baseline") |>
   select_if(~ !all(is.na(.))) |> droplevels() 
 bvars = names(base)
 
-# remove predictors with >20% missing data, illicit drug use and ids
+# remove predictors with >20% missing data, illicit drug use and unused 
+# variables - interview details, gender_id 
 base = base |> select_if(~ sum(is.na(.))<0.2*nrow(base)) |>
   select(-c(eventname, illicit, rel_family_id, rel_birth_id, 
-            interview_date, visit_type)) |> droplevels()
+            interview_date, visit_type, gender_id)) |> droplevels()
 
 bvars[bvars %in% names(base)==F] # checking which were removed
 
@@ -42,10 +43,18 @@ for (var in names(numdat)[-1]) {
 data.frame(vars = names(numdat)[-1], ICC = out) |> sort_by(~ desc(ICC)) 
 # area_depriv = 0.434648072
 # income = 0.130426998
-# comm_safety = 0.094294770
 
-## impute using mice ----
-svg("PREP/mdpattern.svg", width = 30, height = 30)
+## heatmap of correlations ----
+svg("PLOTS/corplot.svg", height = 8, width = 10)
+cor(numdat[,-1], use = "pairwise.complete.obs") |> 
+  reshape2::melt() |> 
+  ggplot(aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(high = "red", low = "blue", mid = "white") + labs(x = NULL, y = NULL) + theme(axis.text.x = element_text(angle = 45))
+dev.off()
+
+## begin imputation using mice ----
+svg("PLOTS/mdpattern.svg", width = 30, height = 30)
 md.pattern(base, rotate.names = TRUE) |> t()
 dev.off()
 
@@ -53,14 +62,31 @@ dev.off()
 pred = make.predictorMatrix(base)
 meth = make.method(base)
 
-# set site_id_l as the cluster
+# remove variables which are not used for imputation
 pred[,"src_subject_id"] = 0
-#pred[,"site_id_l"]= -2 # -2 denotes cluster - figure out do I need to do this??
-pred[,"gender_id"] = 0 # multicollinearitly between gender and birthsex
-pred[,"birthsex"] = 0 # keeping gender only
+
+# multilevel imputation for area_depriv ----
+pred["area_depriv",] = 0
+meth["area_depriv"] = "2l.pmm"
+
+# cluster by site, use cluster means of income as contextual predictor/covariate, plus parent_ed and race_ethnicity as simple covariates
+pred["area_depriv", c("site_id_l", "income", "parent_ed", "race_ethnicity")] = c(-2, 3, 1, 1)
+
+# cluster must be integer for imputation
+base$site_id_l = as.integer(base$site_id_l)
 
 # impute 50 datasets ----
-base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, 
-                m=50, print = FALSE)
+base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 10)
 
-save(base_imp, file = "DATA/baseline_imputed.RData")
+# check for convergence ----
+svg("PLOTS/base_imp_tracelines.svg", height = 50)
+plot(base_imp, layout = c(2, 30))
+dev.off()
+
+#save(base_imp, file = "DATA/baseline_imputed.RData")
+
+imp1 = complete(base_imp, action = 1)
+save(imp1, file = "DATA/baseline_imp1.RData")
+
+imp_dfs = lapply(1:50, function (i) complete(base_imp, action = i))
+save(imp_dfs, file = "DATA/baseline_stacked.RData")

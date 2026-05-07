@@ -135,6 +135,7 @@ demog = demog |> mutate(
 
 # recode factors with labels
 demog = demog |> mutate(
+  needed_food = as.factor(needed_food),
   race_ethnicity = factor(race_ethnicity, 
                           labels = c("White", "Black","Hispanic", 
                                      "Asian", "Other")),
@@ -150,7 +151,7 @@ demog = demog |> mutate(
   parent_ed = case_when(
     is.na(parent_ed) ~ NA_character_,
     parent_ed < 13 ~ "less_HS",
-    parent_ed == 13 | parent_ed == 14 ~ "HS/GED",
+    parent_ed == 13 | parent_ed == 14 ~ "HS_GED",
     parent_ed %in% c(15, 16, 17, 22, 23) ~ "Some_College",
     parent_ed == 18 ~ "Bachelor",
     parent_ed %in% c(19:21) ~ "Postgraduate") |> 
