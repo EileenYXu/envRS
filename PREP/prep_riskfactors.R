@@ -2,8 +2,6 @@
 #### Script for building dataset of depRS predictors from ABCD v5.1 data ####
 #############################################################################
 
-
-
 library(tidyverse)
 
 #### tlfb: alcohol, cannabis, polydrug use ####
@@ -314,7 +312,11 @@ cbcl = read.csv("abcdv5.1/mental-health/mh_p_cbcl.csv") |>
 names(cbcl)[3:4] = c("cbcl_internalising", "cbcl_dsm5_depress")
 
 dat = merge(dat, cbcl, by = c("src_subject_id", "eventname"))
-dat$eventname = as.factor(dat$eventname)
+dat = dat |> mutate(
+  eventname = factor(eventname, 
+                     levels = c("2_year_follow_up_y_arm_1", "baseline_year_1_arm_1"), 
+                     labels = c("y2", "baseline")),
+  site_id_l = as.factor(site_id_l))
 dat_unrelated = dat |> filter(src_subject_id %in% unrelated)
 
 saveRDS(dat_unrelated, "DATA/predictors_unrelatedIDs.rds")
