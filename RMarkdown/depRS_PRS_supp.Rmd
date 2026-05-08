@@ -18,8 +18,8 @@ library(tidyverse)
 library(kableExtra)
 library(performance)
 library(pROC)
-library(summarytools)
-define_keywords(title.dfSummary = "NA", ask = F)
+#library(summarytools)
+#define_keywords(title.dfSummary = "NA", ask = F)
 pal = paletteer::paletteer_d("colorblindr::OkabeIto")
 
 source("C:/Users/eilee/Desktop/PhD/Year 3/envRS/SCRIPTS/summarystats.R")
@@ -298,21 +298,21 @@ ctrl_y_sum = prs_youth |> filter(mdd_lifetime==0) |> get_sum_stats( vars = sumco
 ### Full sample
 
 ```{r}
-summarytools::dfSummary(prs_youth[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#summarytools::dfSummary(prs_youth[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ### Lifetime MDD \= 1
 
 ```{r}
-prs_youth[,-1] |> filter(mdd_lifetime==1) |> 
-summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#prs_youth[,-1] |> filter(mdd_lifetime==1) |> 
+#summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ### Lifetime MDD \= 0
 
 ```{r}
-prs_youth[,-1] |> filter(mdd_lifetime==0) |> 
-summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#prs_youth[,-1] |> filter(mdd_lifetime==0) |> 
+#summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 
@@ -344,19 +344,19 @@ openxlsx::write.xlsx(descriptives, "C://Users/eilee/Desktop/PhD/Year 3/Drafts/en
 ### Full sample
 
 ```{r}
-summarytools::dfSummary(prs_parent[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#summarytools::dfSummary(prs_parent[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ### Lifetime MDD \= 1
 
 ```{r}
-prs_parent[,-1] |> filter(mdd_lifetime==1) |> 
-summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#prs_parent[,-1] |> filter(mdd_lifetime==1) |> 
+#ummarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ### Lifetime MDD \= 0
 
 ```{r}
-prs_parent[,-1] |> filter(mdd_lifetime==0) |> 
-summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#prs_parent[,-1] |> filter(mdd_lifetime==0) |> 
+#summarytools::dfSummary(plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```

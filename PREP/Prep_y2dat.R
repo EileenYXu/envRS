@@ -3,7 +3,6 @@ knitr::opts_chunk$set(echo = F, message = F, results = "asis", warning = F)
 library(tidyverse)
 library(kableExtra)
 options(knitr.kable.NA = '')
-library(summarytools)
 
 
 ## ------------------------------------------------------------------------------------------

@@ -431,17 +431,17 @@ openxlsx::write.xlsx(summaries, "/exports/igmm/datastore/GenScotDepressionusers/
 ## Whole sample
 
 ```{r results='asis'}
-summarytools::dfSummary(sumdat$whole[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#summarytools::dfSummary(sumdat$whole[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Training sample
 
 ```{r results='asis'}
-summarytools::dfSummary(sumdat$train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#summarytools::dfSummary(sumdat$train[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```
 
 ## Test sample
 
 ```{r results='asis'}
-summarytools::dfSummary(sumdat$test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
+#summarytools::dfSummary(sumdat$test[,-1],plain.ascii = F, style = "grid", valid.col = F, graph.col = T, varnumbers = F, tmp.img.dir = "/tmp", max.tbl.height = 300) |> print(method = "render")
 ```

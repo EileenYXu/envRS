@@ -45,7 +45,7 @@ data.frame(vars = names(numdat)[-1], ICC = out) |> sort_by(~ desc(ICC))
 # income = 0.130426998
 
 ## heatmap of correlations ----
-svg("PLOTS/corplot.svg", height = 8, width = 10)
+svg("PLOTS/corplot.svg", height = 8, width = 4)
 cor(numdat[,-1], use = "pairwise.complete.obs") |> 
   reshape2::melt() |> 
   ggplot(aes(x = Var1, y = Var2, fill = value)) +
@@ -54,7 +54,7 @@ cor(numdat[,-1], use = "pairwise.complete.obs") |>
 dev.off()
 
 ## begin imputation using mice ----
-svg("PLOTS/mdpattern.svg", width = 30, height = 30)
+svg("PLOTS/mdpattern.svg", height = 30)
 md.pattern(base, rotate.names = TRUE) |> t()
 dev.off()
 
@@ -84,6 +84,3 @@ plot(base_imp, layout = c(2, 30))
 dev.off()
 
 save(base_imp, file = "DATA/baseline_imputed.RData")
-
-imp_dfs = lapply(1:50, function (i) complete(base_imp, action = i))
-save(imp_dfs, file = "DATA/baseline_dfs.RData")
