@@ -2,9 +2,13 @@
 ## Predicting CBCL depression scores from environmental risk factors ##
 #######################################################################
 
+renv::load()
+
 # Packages ----
 library(tidyverse)
 library(miselect)
+library(mice)
+library(boot)
 set.seed(211206)
 
 load("DATA/baseline_imputed.RData")
@@ -36,27 +40,31 @@ numpreds = c("site_id_l", "sleep_hrs", "bmi", "income", "area_depriv",
 x = list()
 y2 = list()
 base = list()
+scaled = list()
 
-for (i in 1:50) {
+for (i in 1:length(dfs)) {
   
-  df = dfs[[i]] |> filter(src_subject_id %in% train_ids) |> 
-    droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1))
-  
-  x[[i]] = df |> select(all_of(preds)) |> 
+  df = dfs[[i]] |> filter(gender != "GNC") |> 
+    droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
-    mutate(across(all_of(numpreds), ~ scale(as.numeric(.x)))) |> 
-    data.matrix()
+    mutate(across(all_of(c(numpreds), cbcl_dsm5_depress,
+                         cbcl_dsm5_depress_y2), ~ scale(as.numeric(.x))))
+  
+  x[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+    select(all_of(preds)) |> data.matrix()
   
   y2[[i]] = df$cbcl_dsm5_depress_y2
   base[[i]] = df$cbcl_dsm5_depress
   
+  scaled[[i]] = df
 }
 
 # fit EN models ----
 
 # weight each observation by proportion of missing data
-weights = 1 - rowMeans(is.na(
-  base_imp$data[which(base_imp$data$src_subject_id %in% train_ids),]))
+ogdat = base_imp$data |> filter(src_subject_id %in% train_ids)
+
+misweights = 1 - rowMeans(is.na(ogdat))
 
 # do not penalise site_id_l
 pf = c(0, rep(1, 22))
@@ -64,11 +72,118 @@ pf = c(0, rep(1, 22))
 # cross-validate over alphas
 alphas = seq(0, 1, by = 0.1)
 
-# no adaptive weights
+# no adaptive weights (i.e. each of 23 predictors is weighted the same)
 adwt = rep(1, 23)
 
-y2fit = cv.saenet(x, y2, pf = pf, alpha = alphas, weights = weights, 
-                  nfolds = 10, adWeight = adwt, family = "gaussian")
-basefit = cv.saenet(x, base, pf = pf, alpha = alphas, weights = weights, 
-                    nfolds = 10, adWeight = adwt, family = "gaussian")
+####### Fit EN for Y2 CBCL #############
 
+# Cross-validate alpha and lambda ----
+y2fit = cv.saenet(x, y2, pf = pf, alpha = alphas, weights = misweights, 
+                  nfolds = 10, adWeight = adwt, family = "gaussian")
+
+y2_l = y2fit$lambda.min
+y2_a = y2fit$alpha.min
+y2coef = coef(y2fit)
+
+# Bootstrap coefficients ----
+source("ANALYSIS/boot_saenet.R")
+y2_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
+     pred = x, out = y2, pf = pf, a = y2_a, l = y2_l, wt = misweights,
+     adwt = adwt)
+
+# Get CIs for each estimate ----
+y2_boot$t0 = y2coef
+y2_res = data.frame()
+
+for (i in 1:length(y2coef)) {
+  ci = boot.ci(boot.out = y2_boot, conf = 0.95, type = "basic", index = i)
+  pred = names(ci$t0)
+  est = ci$t0
+  lower = ci$basic[4]
+  upper = ci$basic[5]
+  y2_res = rbind(y2_res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
+}
+
+# Test fit ----
+fitlist = list()
+mse = c()
+for (i in 1:length(scaled)) {
+  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids)
+  pred = dat |> select(all_of(preds)) |> data.matrix()
+  ests = y2coef[-1] 
+  depRS = ests %*% t(pred)
+  dat$depRS = t(depRS)
+  fit = lm(cbcl_dsm5_depress_y2 ~ depRS, data = dat)
+  mse = c(mse,mean(fit$residuals^2))
+  fitlist[[i]] = fit
+}
+
+r2 = pool.r.squared(as.mira(fitlist))
+add = data.frame("Predictor"=c("Test R^2", "Test MSE"),
+                 "Estimate"=c(r2[1,1], mean(mse)),
+                 "Lower" = c(r2[1,2], NA),
+                 "Upper" = c(r2[1,3], NA))
+y2_res = rbind(y2_res, add) |> mutate(
+  Estimate = as.numeric(Estimate),
+  Lower = as.numeric(Lower),
+  Upper = as.numeric(Upper)
+)
+
+rm(ci, fit, fitlist, r2, y2, y2_boot, y2fit)
+
+####### Fit EN for Baseline CBCL #############
+
+# Cross-validate alpha and lambda ----
+bfit = cv.saenet(x, base, pf = pf, alpha = alphas, weights = misweights, 
+                  nfolds = 10, adWeight = adwt, family = "gaussian")
+
+b_l = bfit$lambda.min
+b_a = bfit$alpha.min
+bcoef = coef(bfit)
+
+# Bootstrap coefficients ----
+b_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
+               pred = x, out = base, pf = pf, a = b_a, l = b_l, wt = misweights,
+               adwt = adwt)
+
+# Get CIs for each estimate ----
+b_boot$t0 = bcoef
+b_res = data.frame()
+
+for (i in 1:length(bcoef)) {
+  ci = boot.ci(boot.out = b_boot, conf = 0.95, type = "basic", index = i)
+  pred = names(ci$t0)
+  est = ci$t0
+  lower = ci$basic[4]
+  upper = ci$basic[5]
+  b_res = rbind(b_res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
+}
+
+# Test fit ----
+fitlist = list()
+mse = c()
+for (i in 1:length(scaled)) {
+  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids)
+  pred = dat |> select(all_of(preds)) |> data.matrix()
+  ests = bcoef[-1] 
+  depRS = ests %*% t(pred)
+  dat$depRS = t(depRS)
+  fit = lm(cbcl_dsm5_depress ~ depRS, data = dat)
+  mse = c(mse,mean(fit$residuals^2))
+  fitlist[[i]] = fit
+}
+
+r2 = pool.r.squared(as.mira(fitlist))
+add = data.frame("Predictor"=c("Test R^2", "Test MSE"),
+                 "Estimate"=c(r2[1,1], mean(mse)),
+                 "Lower" = c(r2[1,2], NA),
+                 "Upper" = c(r2[1,3], NA))
+b_res = rbind(b_res, add) |> mutate(
+  Estimate = as.numeric(Estimate),
+  Lower = as.numeric(Lower),
+  Upper = as.numeric(Upper)
+)
+
+### Save ----
+results = list("Y2 CBCL" = y2_res, "Baseline CBCL" = b_res)
+openxlsx::write.xlsx(results, file = "ANALYSIS/OUT/depRS_main.xlsx")
