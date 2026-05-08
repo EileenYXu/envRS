@@ -79,8 +79,13 @@ base$site_id_l = as.integer(base$site_id_l)
 base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 5)
 
 # check for convergence ----
-imp2 = mice.mids(base_imp, maxit = 10)
-svg("PLOTS/base_imp_tracelines.svg", height = 50)
+svg("PLOTS/base_imp_tracelines.svg", height = 30)
+plot(base_imp, layout = c(2, 30))
+dev.off()
+
+# add more iterations to check
+imp2 = mice.mids(base_imp, maxit = 25)
+svg("PLOTS/base_imp2_tracelines.svg", height = 30)
 plot(imp2, layout = c(2, 30))
 dev.off()
 
