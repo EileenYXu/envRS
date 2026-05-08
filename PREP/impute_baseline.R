@@ -2,6 +2,8 @@
 ## Impute missing baseline predictors and CBCL data ##
 ######################################################
 
+renv::load()
+
 ## packages ----
 library(tidyverse)
 library(mice)
