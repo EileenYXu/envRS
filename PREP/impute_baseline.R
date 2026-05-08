@@ -45,7 +45,7 @@ data.frame(vars = names(numdat)[-1], ICC = out) |> sort_by(~ desc(ICC))
 # income = 0.130426998
 
 ## heatmap of correlations ----
-svg("PLOTS/corplot.svg", height = 8, width = 4)
+svg("PLOTS/corplot.svg", height = 8, width = 8)
 cor(numdat[,-1], use = "pairwise.complete.obs") |> 
   reshape2::melt() |> 
   ggplot(aes(x = Var1, y = Var2, fill = value)) +
@@ -76,11 +76,12 @@ pred["area_depriv", c("site_id_l", "income", "parent_ed", "race_ethnicity")] = c
 base$site_id_l = as.integer(base$site_id_l)
 
 # impute 50 datasets ----
-base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 50)
+base_imp = mice(base, seed = 2404, predictorMatrix = pred, method = meth, m=50, maxit = 5)
 
 # check for convergence ----
+imp2 = mice.mids(base_imp, maxit = 10)
 svg("PLOTS/base_imp_tracelines.svg", height = 50)
-plot(base_imp, layout = c(2, 30))
+plot(imp2, layout = c(2, 30))
 dev.off()
 
 save(base_imp, file = "DATA/baseline_imputed.RData")
