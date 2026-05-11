@@ -47,8 +47,8 @@ for (i in 1:length(dfs)) {
   df = dfs[[i]] |> filter(gender != "GNC") |> 
     droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
-    mutate(across(all_of(c(numpreds), cbcl_dsm5_depress,
-                         cbcl_dsm5_depress_y2), ~ scale(as.numeric(.x))))
+    mutate(across(all_of(c(numpreds, cbcl_dsm5_depress,
+                         cbcl_dsm5_depress_y2)), ~ scale(as.numeric(.x)))
   
   x[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
     select(all_of(preds)) |> data.matrix()
