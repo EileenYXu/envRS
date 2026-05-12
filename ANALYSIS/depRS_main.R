@@ -47,14 +47,16 @@ for (i in 1:length(dfs)) {
   df = dfs[[i]] |> filter(gender != "GNC") |> 
     droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
-    mutate(across(all_of(c(numpreds, cbcl_dsm5_depress,
-                         cbcl_dsm5_depress_y2)), ~ scale(as.numeric(.x)))
+    mutate(across(all_of(numpreds),  ~ scale(as.numeric(.x)))) |> 
+    mutate(across(cbcl_dsm5_depress:cbcl_dsm5_depress_y2, ~ scale(as.numeric(.x))))
   
   x[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
     select(all_of(preds)) |> data.matrix()
   
-  y2[[i]] = df$cbcl_dsm5_depress_y2
-  base[[i]] = df$cbcl_dsm5_depress
+  y2[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+    pull(cbcl_dsm5_depress_y2) |> as.vector()
+  base[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+    pull(cbcl_dsm5_depress) |> as.vector()
   
   scaled[[i]] = df
 }
@@ -78,7 +80,7 @@ adwt = rep(1, 23)
 ####### Fit EN for Y2 CBCL #############
 
 # Cross-validate alpha and lambda ----
-y2fit = cv.saenet(x, y2, pf = pf, alpha = alphas, weights = misweights, 
+y2fit = cv.saenet(x = x, y = y2, pf = pf, alpha = alphas, weights = misweights, 
                   nfolds = 10, adWeight = adwt, family = "gaussian")
 
 y2_l = y2fit$lambda.min
