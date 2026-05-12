@@ -12,8 +12,8 @@ boot_saenet <- function(data, pred, out, pf, a, l, wt, adwt, indices) {
   boot_wt = wt[indices]
   
   for (i in 1:length(x)) {
-    boot_x[[i]] = pred[[i]][indices,]
-    boot_y[[i]] = out[[i]][indices]
+    boot_x[[i]] = pred[[i]][indices,] |> as.matrix()
+    boot_y[[i]] = out[[i]][indices] |> as.vector()
   }
   
   fit = saenet(x = boot_x, y = boot_y, pf = pf, alpha = a, lambda = l,

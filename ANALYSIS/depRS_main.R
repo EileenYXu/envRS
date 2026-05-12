@@ -3,8 +3,13 @@
 #######################################################################
 
 renv::load()
+here::i_am("ANALYSIS/depRS_main.R")
 
 # Packages ----
+library(futurize)
+
+plan(multisession)
+
 library(tidyverse)
 library(miselect)
 library(mice)
@@ -14,7 +19,8 @@ set.seed(211206)
 load("DATA/baseline_imputed.RData")
 load("DATA/idlist_main.RData")
 
-dfs = lapply(1:50, function (i) complete(base_imp, action = i))
+dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |> 
+  futurize()
 
 # depRS predictor variables ----
 preds = c("site_id_l", "tobacco_puff", "weightcontrol_ksads", 
@@ -133,6 +139,8 @@ y2_res = rbind(y2_res, add) |> mutate(
 
 rm(ci, fit, fitlist, r2, y2, y2_boot, y2fit)
 
+write.csv(y2_res, file = "ANALYSIS/OUT/depRS_main_Y2.csv")
+
 ####### Fit EN for Baseline CBCL #############
 
 # Cross-validate alpha and lambda ----
@@ -185,6 +193,8 @@ b_res = rbind(b_res, add) |> mutate(
   Lower = as.numeric(Lower),
   Upper = as.numeric(Upper)
 )
+
+write.csv(b_res, file = "ANALYSIS/OUT/depRS_main_base.csv")
 
 ### Save ----
 results = list("Y2 CBCL" = y2_res, "Baseline CBCL" = b_res)
