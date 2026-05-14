@@ -2,8 +2,10 @@
 ## Predicting CBCL depression scores from environmental risk factors ##
 #######################################################################
 
+#### SENSITIVITY ANALYSIS WITH SEX ASSIGNED AT BIRTH ####
+
 renv::load()
-here::i_am("ANALYSIS/depRS_main_b.R")
+here::i_am("ANALYSIS/Sensitivity/depRS_sex_b.R")
 
 # Packages ----
 library(futurize)
@@ -26,12 +28,12 @@ dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |>
 preds = c("site_id_l", "tobacco_puff", "weightcontrol_ksads", 
           "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", 
           "p_abuse", "emot_abuse", "serious_accident", "sleep_hrs", "bmi", 
-          "needed_food", "income", "gender", "area_depriv", "comm_safety", 
+          "needed_food", "income", "birthsex", "area_depriv", "comm_safety", 
           "days_acti", "fam_conflict", "p_monitoring", "p_acceptance", 
           "p_depression", "interview_age")
 
 # binary predictors to be dummy coded as 0/1 
-# gender recoded as M=0, F=1 below
+# birthsex recoded as M=0, F=1 below
 binpreds = c("tobacco_puff", "weightcontrol_ksads", "witness_comm_violence",
              "death_loved_one", "witness_dv", "s_abuse", "p_abuse", "emot_abuse",
              "serious_accident", "needed_food")
@@ -50,8 +52,8 @@ scaled = list()
 
 for (i in 1:length(dfs)) {
   
-  df = dfs[[i]] |> filter(gender != "GNC") |> 
-    droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1)) |> 
+  df = dfs[[i]] |> filter(birthsex != "Intersex") |> 
+    droplevels() |> mutate(birthsex = case_when(birthsex=="M"~0, birthsex=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
     mutate(across(all_of(numpreds),  ~ scale(as.numeric(.x)))) |> 
     mutate(across(cbcl_dsm5_depress:cbcl_dsm5_depress_y2, ~ scale(as.numeric(.x))))
@@ -87,7 +89,7 @@ adwt = rep(1, 23)
 
 # Cross-validate alpha and lambda ----
 bfit = cv.saenet(x, base, pf = pf, alpha = alphas, weights = misweights, 
-                  nfolds = 10, adWeight = adwt, family = "gaussian")
+                 nfolds = 10, adWeight = adwt, family = "gaussian")
 
 b_l = bfit$lambda.min
 b_a = bfit$alpha.min
@@ -97,8 +99,8 @@ bcoef = coef(bfit)
 source("ANALYSIS/boot_saenet.R")
 
 b_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
-               pred = x, out = base, pf = pf, a = b_a, l = b_l, wt = misweights,
-               adwt = adwt)
+              pred = x, out = base, pf = pf, a = b_a, l = b_l, wt = misweights,
+              adwt = adwt)
 
 # Get CIs for each estimate ----
 b_boot$t0 = bcoef
@@ -138,4 +140,4 @@ b_res = rbind(b_res, add) |> mutate(
   Upper = as.numeric(Upper)
 )
 
-write.csv(b_res, file = "ANALYSIS/OUT/depRS_main_base.csv")
+write.csv(b_res, file = "ANALYSIS/OUT/depRS_sex_base.csv")

@@ -1,9 +1,9 @@
-#######################################################################
-## Predicting CBCL depression scores from environmental risk factors ##
-#######################################################################
+##########################################################################
+## Predicting CBCL internalising scores from environmental risk factors ##
+##########################################################################
 
 renv::load()
-here::i_am("ANALYSIS/depRS_main_b.R")
+here::i_am("ANALYSIS/Sensitivity/intRS_b.R")
 
 # Packages ----
 library(futurize)
@@ -54,15 +54,15 @@ for (i in 1:length(dfs)) {
     droplevels() |> mutate(gender = case_when(gender=="M"~0, gender=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
     mutate(across(all_of(numpreds),  ~ scale(as.numeric(.x)))) |> 
-    mutate(across(cbcl_dsm5_depress:cbcl_dsm5_depress_y2, ~ scale(as.numeric(.x))))
+    mutate(across(cbcl_internalising:cbcl_internalising_y2, ~ scale(as.numeric(.x))))
   
   x[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
     select(all_of(preds)) |> data.matrix()
   
   y2[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
-    pull(cbcl_dsm5_depress_y2) |> as.vector()
+    pull(cbcl_internalising_y2) |> as.vector()
   base[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
-    pull(cbcl_dsm5_depress) |> as.vector()
+    pull(cbcl_internalising) |> as.vector()
   
   scaled[[i]] = df
 }
@@ -87,7 +87,7 @@ adwt = rep(1, 23)
 
 # Cross-validate alpha and lambda ----
 bfit = cv.saenet(x, base, pf = pf, alpha = alphas, weights = misweights, 
-                  nfolds = 10, adWeight = adwt, family = "gaussian")
+                 nfolds = 10, adWeight = adwt, family = "gaussian")
 
 b_l = bfit$lambda.min
 b_a = bfit$alpha.min
@@ -97,8 +97,8 @@ bcoef = coef(bfit)
 source("ANALYSIS/boot_saenet.R")
 
 b_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
-               pred = x, out = base, pf = pf, a = b_a, l = b_l, wt = misweights,
-               adwt = adwt)
+              pred = x, out = base, pf = pf, a = b_a, l = b_l, wt = misweights,
+              adwt = adwt)
 
 # Get CIs for each estimate ----
 b_boot$t0 = bcoef
@@ -122,7 +122,7 @@ for (i in 1:length(scaled)) {
   ests = bcoef[-1] 
   depRS = ests %*% t(pred)
   dat$depRS = t(depRS)
-  fit = lm(cbcl_dsm5_depress ~ depRS, data = dat)
+  fit = lm(cbcl_internalising ~ depRS, data = dat)
   mse = c(mse,mean(fit$residuals^2))
   fitlist[[i]] = fit
 }
@@ -138,4 +138,4 @@ b_res = rbind(b_res, add) |> mutate(
   Upper = as.numeric(Upper)
 )
 
-write.csv(b_res, file = "ANALYSIS/OUT/depRS_main_base.csv")
+write.csv(b_res, file = "ANALYSIS/OUT/intRS_base.csv")
