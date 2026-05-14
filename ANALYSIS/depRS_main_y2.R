@@ -26,7 +26,7 @@ dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |>
 preds = c("site_id_l", "tobacco_puff", "weightcontrol_ksads", 
           "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", 
           "p_abuse", "emot_abuse", "serious_accident", "sleep_hrs", "bmi", 
-          "needed_food", "income", "gender", "area_depriv", "comm_safety", 
+          "needed_food", "income", "parent_ed", "gender", "area_depriv", "comm_safety", 
           "days_acti", "fam_conflict", "p_monitoring", "p_acceptance", 
           "p_depression", "interview_age")
 
@@ -37,7 +37,7 @@ binpreds = c("tobacco_puff", "weightcontrol_ksads", "witness_comm_violence",
              "serious_accident", "needed_food")
 
 # numeric predictors to be centred and scaled
-numpreds = c("site_id_l", "sleep_hrs", "bmi", "income", "area_depriv", 
+numpreds = c("site_id_l", "sleep_hrs", "bmi", "income", "parent_ed", "area_depriv", 
              "comm_safety", "days_acti", "fam_conflict", "p_monitoring", 
              "p_acceptance", "p_depression", "interview_age")
 
@@ -75,29 +75,32 @@ ogdat = base_imp$data |> filter(src_subject_id %in% train_ids)
 misweights = 1 - rowMeans(is.na(ogdat))
 
 # do not penalise site_id_l
-pf = c(0, rep(1, 22))
+pf = c(0, rep(1, 23))
 
 # cross-validate over alphas
 alphas = seq(0, 1, by = 0.1)
 
-# no adaptive weights (i.e. each of 23 predictors is weighted the same)
-adwt = rep(1, 23)
+# no adaptive weights (i.e. each of 24 predictors is weighted the same)
+adwt = rep(1, 24)
 
 ####### Fit EN for Y2 CBCL #############
 
 # Cross-validate alpha and lambda ----
 y2fit = cv.saenet(x = x, y = y2, pf = pf, alpha = alphas, weights = misweights, 
-                  nfolds = 10, adWeight = adwt, family = "gaussian")
+                  nfolds = 10, adWeight = adwt, family = "gaussian") 
 
 y2_l = y2fit$lambda.min
 y2_a = y2fit$alpha.min
 y2coef = coef(y2fit)
 
+y2_a
+
 # Bootstrap coefficients ----
 source("ANALYSIS/boot_saenet.R")
+
 y2_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
      pred = x, out = y2, pf = pf, a = y2_a, l = y2_l, wt = misweights,
-     adwt = adwt)
+     adwt = adwt) |> futurize(seed=TRUE)
 
 # Get CIs for each estimate ----
 y2_boot$t0 = y2coef

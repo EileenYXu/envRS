@@ -7,18 +7,21 @@
 # l = lambda.min
 # indices come from boot() 
 boot_saenet <- function(data, pred, out, pf, a, l, wt, adwt, indices) {
+  
   boot_x = list()
   boot_y = list()
   boot_wt = wt[indices]
   
-  for (i in 1:length(x)) {
+  for (i in 1:length(pred)) {
     boot_x[[i]] = pred[[i]][indices,] |> as.matrix()
     boot_y[[i]] = out[[i]][indices] |> as.vector()
   }
   
-  fit = saenet(x = boot_x, y = boot_y, pf = pf, alpha = a, lambda = l,
+  fit = miselect::saenet(x = boot_x, y = boot_y, pf = pf, alpha = a, lambda = l,
                weights = boot_wt, adWeight =  adwt)
   
-  return(coef(fit, alpha = a, lambda = l))
+  output = coef(fit, alpha = a, lambda = l)
+  
+  return(output)
 }
 

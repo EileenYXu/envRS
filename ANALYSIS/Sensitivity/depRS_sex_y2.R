@@ -18,7 +18,7 @@ library(boot)
 set.seed(211206)
 
 load("DATA/baseline_imputed.RData")
-load("DATA/idlist_main.RData")
+load("DATA/idlist_sens.RData")
 
 dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |> 
   futurize()
@@ -27,7 +27,7 @@ dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |>
 preds = c("site_id_l", "tobacco_puff", "weightcontrol_ksads", 
           "witness_comm_violence", "death_loved_one", "witness_dv", "s_abuse", 
           "p_abuse", "emot_abuse", "serious_accident", "sleep_hrs", "bmi", 
-          "needed_food", "income", "birthsex", "area_depriv", "comm_safety", 
+          "needed_food", "income", "parent_ed", "birthsex", "area_depriv", "comm_safety", 
           "days_acti", "fam_conflict", "p_monitoring", "p_acceptance", 
           "p_depression", "interview_age")
 
@@ -38,7 +38,7 @@ binpreds = c("tobacco_puff", "weightcontrol_ksads", "witness_comm_violence",
              "serious_accident", "needed_food")
 
 # numeric predictors to be centred and scaled
-numpreds = c("site_id_l", "sleep_hrs", "bmi", "income", "area_depriv", 
+numpreds = c("site_id_l", "sleep_hrs", "bmi", "income", "parent_ed", "area_depriv", 
              "comm_safety", "days_acti", "fam_conflict", "p_monitoring", 
              "p_acceptance", "p_depression", "interview_age")
 
@@ -51,18 +51,18 @@ scaled = list()
 
 for (i in 1:length(dfs)) {
   
-  df = dfs[[i]] |> filter(birthsex != "GNC") |> 
+  df = dfs[[i]] |> filter(birthsex != "Intersex") |> 
     droplevels() |> mutate(birthsex = case_when(birthsex=="M"~0, birthsex=="F"~1)) |> 
     mutate(across(all_of(binpreds), ~ as.numeric(.x) - 1)) |> 
     mutate(across(all_of(numpreds),  ~ scale(as.numeric(.x)))) |> 
     mutate(across(cbcl_dsm5_depress:cbcl_dsm5_depress_y2, ~ scale(as.numeric(.x))))
   
-  x[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+  x[[i]] = df |> filter(src_subject_id %in% train_ids_sens) |> 
     select(all_of(preds)) |> data.matrix()
   
-  y2[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+  y2[[i]] = df |> filter(src_subject_id %in% train_ids_sens) |> 
     pull(cbcl_dsm5_depress_y2) |> as.vector()
-  base[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
+  base[[i]] = df |> filter(src_subject_id %in% train_ids_sens) |> 
     pull(cbcl_dsm5_depress) |> as.vector()
   
   scaled[[i]] = df
@@ -71,19 +71,19 @@ for (i in 1:length(dfs)) {
 # fit EN models ----
 
 # weight each observation by proportion of missing data
-ogdat = base_imp$data |> filter(birthsex != "Intersex") |> 
-  filter(src_subject_id %in% train_ids)
+ogdat = base_imp$data |> 
+  filter(src_subject_id %in% train_ids_sens)
 
 misweights = 1 - rowMeans(is.na(ogdat))
 
 # do not penalise site_id_l
-pf = c(0, rep(1, 22))
+pf = c(0, rep(1, 23))
 
 # cross-validate over alphas
 alphas = seq(0, 1, by = 0.1)
 
-# no adaptive weights (i.e. each of 23 predictors is weighted the same)
-adwt = rep(1, 23)
+# no adaptive weights (i.e. each of 24 predictors is weighted the same)
+adwt = rep(1, 24)
 
 ####### Fit EN for Y2 CBCL #############
 
@@ -95,12 +95,15 @@ y2_l = y2fit$lambda.min
 y2_a = y2fit$alpha.min
 y2coef = coef(y2fit)
 
+y2_a
+y2_l
+
 # Bootstrap coefficients ----
 source("ANALYSIS/boot_saenet.R")
 
 y2_boot = boot(data = x[[1]], statistic = boot_saenet, R = 2000,
                pred = x, out = y2, pf = pf, a = y2_a, l = y2_l, wt = misweights,
-               adwt = adwt)
+               adwt = adwt) |> futurize(seed=TRUE)
 
 # Get CIs for each estimate ----
 y2_boot$t0 = y2coef
@@ -119,7 +122,7 @@ for (i in 1:length(y2coef)) {
 fitlist = list()
 mse = c()
 for (i in 1:length(scaled)) {
-  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids)
+  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids_sens)
   pred = dat |> select(all_of(preds)) |> data.matrix()
   ests = y2coef[-1] 
   depRS = ests %*% t(pred)
