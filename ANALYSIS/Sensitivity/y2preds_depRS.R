@@ -118,6 +118,7 @@ boot_glmnet <- function(x, indices, alpha, lambda, pf){
   return(output)
 }
 
+
 boot = boot(data = train, statistic = boot_glmnet, R = 3,
             alpha = alpha, lambda = lambda, pf = pf, stype = "i") |> 
   futurize(seed = TRUE)
