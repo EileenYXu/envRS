@@ -71,7 +71,8 @@ for (i in 1:length(dfs)) {
 # fit EN models ----
 
 # weight each observation by proportion of missing data
-ogdat = base_imp$data |> filter(src_subject_id %in% train_ids)
+ogdat = base_imp$data |> filter(birthsex != "Intersex") |> 
+  filter(src_subject_id %in% train_ids)
 
 misweights = 1 - rowMeans(is.na(ogdat))
 
