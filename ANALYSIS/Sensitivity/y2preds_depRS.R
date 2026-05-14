@@ -118,7 +118,19 @@ boot_glmnet <- function(x, indices, alpha, lambda, pf){
   return(output)
 }
 
-
-boot = boot(data = train, statistic = boot_glmnet, R = 3,
+boot = boot(data = train, statistic = boot_glmnet, R = 2000,
             alpha = alpha, lambda = lambda, pf = pf, stype = "i") |> 
   futurize(seed = TRUE)
+
+res = data.frame()
+
+for (i in 1:length(coefs)) {
+  ci = boot.ci(boot.out = boot, conf = 0.95, type = "basic", index = i)
+  pred = names(ci$t0)
+  est = ci$t0
+  lower = ci$basic[4]
+  upper = ci$basic[5]
+  res = rbind(res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
+}
+
+write.csv(res, file = "ANALYSIS/OUT/y2_depRS_sens.csv")

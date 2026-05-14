@@ -19,7 +19,7 @@ library(boot)
 set.seed(211206)
 
 load("DATA/baseline_imputed.RData")
-load("DATA/idlist_sens.RDatata")
+load("DATA/idlist_sens.RData")
 
 dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |> 
   futurize()
