@@ -19,6 +19,8 @@ boot_saenet <- function(data, pred, out, pf, a, l, wt, adwt, indices) {
   fit = saenet(x = boot_x, y = boot_y, pf = pf, alpha = a, lambda = l,
                weights = boot_wt, adWeight =  adwt)
   
-  return(coef(fit, alpha = a, lambda = l))
+  output = coef(fit, alpha = a, lambda = l)
+  
+  return(output)
 }
 
