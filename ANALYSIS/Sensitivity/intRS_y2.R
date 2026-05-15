@@ -8,7 +8,7 @@ here::i_am("ANALYSIS/Sensitivity/intRS_y2.R")
 # Packages ----
 library(futurize)
 
-plan(multisession)
+plan(multisession, workers = 3)
 
 library(tidyverse)
 library(miselect)

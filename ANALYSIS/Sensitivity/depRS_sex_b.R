@@ -10,7 +10,7 @@ here::i_am("ANALYSIS/Sensitivity/depRS_sex_b.R")
 # Packages ----
 library(futurize)
 
-plan(multisession)
+plan(multisession, workers = 3)
 
 library(tidyverse)
 library(miselect)

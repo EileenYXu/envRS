@@ -8,7 +8,7 @@ here::i_am("ANALYSIS/depRS_main_y2.R")
 # Packages ----
 library(futurize)
 
-plan(multisession)
+plan(multisession, workers=3)
 
 library(tidyverse)
 library(miselect)
@@ -20,7 +20,7 @@ load("DATA/baseline_imputed.RData")
 load("DATA/idlist_main.RData")
 
 dfs = lapply(1:50, function (i) complete(base_imp, action = i)) |> 
-  futurize()
+  futurize(seed=TRUE)
 
 # depRS predictor variables ----
 preds = c("site_id_l", "tobacco_puff", "weightcontrol_ksads", 
