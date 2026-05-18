@@ -8,7 +8,8 @@
 #------------------------------
 # useful references are the 'growthcleanr' package and CDC growth charts, particularly the page on biologically implausible values (BIV) https://www.cdc.gov/nccdphp/dnpao/growthcharts/resources/sas.htm#Extreme
 
-
+renv::load()
+here::i_am("PREP/anthro_BMI_modzscores.R")
 
 library(tidyverse)
 #install.packages("growthcleanr")
@@ -115,4 +116,4 @@ modscores %>% select(src_subject_id, age_yr, wt, ht, bmi, sex, mod_bmiz, biv, bi
 # difference between +9 and +10
 modscores %>% select(src_subject_id, age_yr, wt, ht, bmi, sex, mod_bmiz, biv, biv_9SD, biv_10SD) %>% filter(biv_9SD=="high biv" & biv_10SD=="plausible")
 
-#write.csv(modscores, "DATA/BMI_modified_z.csv")
+write.csv(modscores, "DATA/BMI_modified_z.csv")

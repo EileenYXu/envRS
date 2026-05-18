@@ -36,17 +36,3 @@ train_ids_sens = sensdat$src_subject_id[t_index]
 test_ids_sens = sensdat$src_subject_id[-t_index]
 
 save(train_ids_sens, test_ids_sens, file="DATA/idlist_sens.RData")
-
-# Code to create bootstrap samples ----
-# saving this for later use - it's too large to justify making in advance and saving...
-traindat = dat[which(dat$src_subject_id %in% train_ids),]
-
-samps = createResample(y = traindat$cbcl_dsm5_depress_y2, times = 2000)
-
-for (samp in 1:2000) {
-  index = samps[[samp]]
-  ids = train_ids[index]
-  idlist[[paste("Resample", samp, collapse = "_")]] = ids
-}
-
-

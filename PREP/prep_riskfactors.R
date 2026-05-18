@@ -2,6 +2,8 @@
 #### Script for building dataset of depRS predictors from ABCD v5.1 data ####
 #############################################################################
 
+renv::load()
+here::i_am("PREP/prep_riskfactors.R")
 library(tidyverse)
 
 #### tlfb: alcohol, cannabis, polydrug use ####
