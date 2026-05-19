@@ -323,65 +323,81 @@ dat = dat |> mutate(
 dat_unrelated = dat |> filter(src_subject_id %in% unrelated)
 
 saveRDS(dat_unrelated, "DATA/predictors_unrelatedIDs.rds")
-#saveRDS(dat, "DATA/predictors_allIDs.rds")
+saveRDS(dat, "DATA/predictors_allIDs.rds")
 
 #### youth ksads ####
-y_ksads = read.csv("abcdv5.1/mental-health/mh_y_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_t", "ksads_1_841_t", "ksads_1_842_t", "ksads_1_843_t", "ksads_1_844_t", "ksads_1_845_t", "ksads_1_846_t", "ksads_1_847_t") |> filter(src_subject_id %in% unrelated)
+y_ksads = read.csv("abcdv5.1/mental-health/mh_y_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_t", "ksads_1_841_t", "ksads_1_842_t", "ksads_1_843_t", "ksads_1_844_t", "ksads_1_845_t", "ksads_1_846_t", "ksads_1_847_t")
 
 names(y_ksads) = c("src_subject_id", "eventname", "mdd_present", "mdd_remission", "mdd_past", "pdd_present", "pdd_remission", "pdd_past", "unspec_present", "unspec_past")
 
 # code missing values
-y_ksads = y_ksads |> mutate(
-  across(3:ncol(y_ksads), ~as.factor(case_match(.,
-                                                0 ~ 0,
-                                                1 ~ 1,
-                                                c(555, 888) ~ NA
-  ))),
-)
+y_ksads = y_ksads |> mutate(across(3:ncol(y_ksads), ~as.factor(
+  recode_values(., from = c(0, 1, 555, 888), to = c(0, 1, NA, NA)))))
 
-# code lifetime mdd and lifetime depressive disorder
+# code lifetime mdd
 y_ksads = y_ksads |> mutate(
   mdd_lifetime = as.factor(
-    ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1, 1, 0)),
-  any_lifetime = as.factor(
-    ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1 | 
-             pdd_present==1 | pdd_remission==1 | pdd_past==1 | 
-             unspec_present==1 | unspec_past==1, 1, 0)))
+    case_when(
+      mdd_present==1 | mdd_remission==1 | mdd_past==1 ~ 1,
+      is.na(mdd_present) & is.na(mdd_remission) & is.na(mdd_past) ~ NA,
+      .default = 0)))
 
-y_ksads_event = list(
-  base = y_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
-  y2 = y_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit()
-)
+base = y_ksads |> filter(eventname=="baseline_year_1_arm_1") |>  
+  select(src_subject_id, mdd_lifetime) |> setNames(c("src_subject_id", "mdd_b"))
 
-saveRDS(y_ksads_event, "DATA/ksads_y.rds")
-rm(y_ksads)
+y2 = y_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> 
+  select(src_subject_id, mdd_lifetime)
+
+y_ksads = merge(base, y2, by = "src_subject_id", all = TRUE) 
+
+y_ksads = y_ksads |> mutate(
+  mdd_incident = as.factor(case_when(
+    mdd_b=="1" ~ "exclude",
+    is.na(mdd_b) ~ NA,
+    mdd_lifetime=="1" ~ "1",
+    mdd_lifetime=="0" ~ "0",
+    is.na(mdd_lifetime) ~ NA
+    ))) |> select(src_subject_id, mdd_b, mdd_lifetime, mdd_incident)
+
+summary(y_ksads)
+
+saveRDS(y_ksads, "DATA/ksads_y.rds")
 
 #### parent ksads ####
-p_ksads = read.csv("abcdv5.1/mental-health/mh_p_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_p", "ksads_1_841_p", "ksads_1_842_p", "ksads_1_843_p", "ksads_1_844_p", "ksads_1_845_p", "ksads_1_846_p", "ksads_1_847_p") |> filter(src_subject_id %in% unrelated)
+p_ksads = read.csv("abcdv5.1/mental-health/mh_p_ksads_ss.csv") |> select("src_subject_id", "eventname", "ksads_1_840_p", "ksads_1_841_p", "ksads_1_842_p", "ksads_1_843_p", "ksads_1_844_p", "ksads_1_845_p", "ksads_1_846_p", "ksads_1_847_p")
 
 names(p_ksads) =  c("src_subject_id", "eventname", "mdd_present", "mdd_remission", "mdd_past", "pdd_present", "pdd_remission", "pdd_past", "unspec_present", "unspec_past")
 
-# code missing
+# code missing values
 p_ksads = p_ksads |> mutate(
-  across(3:ncol(p_ksads), ~as.factor(case_match(.,
-                                                0 ~ 0,
-                                                1 ~ 1,
-                                                c(555, 888) ~ NA
-  ))),
-)
+  across(3:ncol(p_ksads), ~as.factor(
+    recode_values(., from = c(0, 1, 555, 888), to = c(0, 1, NA, NA)))))
 
-# code lifetime mdd and lifetime depressive disorder
+# code lifetime mdd
 p_ksads = p_ksads |> mutate(
   mdd_lifetime = as.factor(
-    ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1, 1, 0)),
-  any_lifetime = as.factor(ifelse(mdd_present==1 | mdd_remission==1 | mdd_past==1 |
-                                    pdd_present==1 | pdd_remission==1 | pdd_past==1 |
-                                    unspec_present==1 | unspec_past==1, 1, 0)))
+    case_when(
+      mdd_present==1 | mdd_remission==1 | mdd_past==1 ~ 1,
+      is.na(mdd_present) & is.na(mdd_remission) & is.na(mdd_past) ~ NA,
+      .default = 0)))
 
-p_ksads_event = list(
-  base = p_ksads |> filter(eventname=="baseline_year_1_arm_1") |> na.omit(),
-  y2 = p_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> na.omit()
-)
+base = p_ksads |> filter(eventname=="baseline_year_1_arm_1") |>  
+  select(src_subject_id, mdd_lifetime) |> setNames(c("src_subject_id", "mdd_b"))
 
-saveRDS(p_ksads_event, "DATA/ksads_p.rds")
-rm(p_ksads)
+y2 = p_ksads |> filter(eventname=="2_year_follow_up_y_arm_1") |> 
+  select(src_subject_id, mdd_lifetime)
+
+p_ksads = merge(base, y2, by = "src_subject_id", all = TRUE) 
+
+p_ksads = p_ksads |> mutate(
+  mdd_incident = as.factor(case_when(
+    mdd_b=="1" ~ "exclude",
+    is.na(mdd_b) ~ NA,
+    mdd_lifetime=="1" ~ "1",
+    mdd_lifetime=="0" ~ "0",
+    is.na(mdd_lifetime) ~ NA
+  ))) |> select(src_subject_id, mdd_b, mdd_lifetime, mdd_incident)
+
+summary(p_ksads)
+
+saveRDS(p_ksads, "DATA/ksads_p.rds")
