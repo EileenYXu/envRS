@@ -1021,6 +1021,68 @@
       "Maintainer": "Emil Hvitfeldt <emil.hvitfeldt@posit.co>",
       "Repository": "CRAN"
     },
+    "broom.mixed": {
+      "Package": "broom.mixed",
+      "Version": "0.2.9.7",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Tidying Methods for Mixed Models",
+      "Authors@R": "c( person(\"Ben\", \"Bolker\", email = \"bolker@mcmaster.ca\", role = c(\"aut\", \"cre\"), comment=c(ORCID=\"0000-0002-2127-0443\")), person(\"David\", \"Robinson\", email = \"admiral.david@gmail.com\", role = \"aut\"), person(\"Dieter\", \"Menne\", role = \"ctb\"), person(\"Jonah\", \"Gabry\", role = \"ctb\"), person(\"Paul\", \"Buerkner\", role = \"ctb\"), person(\"Christopher\", \"Hua\", role = \"ctb\"), person(\"William\", \"Petry\", role = \"ctb\", comment=c(ORCID=\"0000-0002-5230-5987\")), person(\"Joshua\", \"Wiley\", role = \"ctb\", comment=c(ORCID=\"0000-0002-0271-6702\")), person(\"Patrick\", \"Kennedy\", role = \"ctb\"), person(\"Eduard\", \"Szöcs\", role = \"ctb\", comment=c(ORCID = \"0000-0001-5376-1194\", sponsor = \"BASF SE\")), person(\"Indrajeet\", \"Patil\", role=\"ctb\"), person(\"Vincent\", \"Arel-Bundock\", email = \"vincent.arel-bundock@umontreal.ca\", role = \"ctb\", comment = c(ORCID = \"0000-0003-2042-7063\")), person(\"Bill\", \"Denney\", role = \"ctb\"), person(\"Cory\", \"Brunson\", role = \"ctb\"), person(\"Joe\", \"Wasserman\", role = \"ctb\", comment = c(ORCID = \"0000-0002-9705-1853\")), person(\"Alexey\", \"Stukalov\", role = \"ctb\"), person(\"Matthieu\", \"Bruneaux\", role = \"ctb\") )",
+      "Maintainer": "Ben Bolker <bolker@mcmaster.ca>",
+      "Description": "Convert fitted objects from various R mixed-model packages into tidy data frames along the lines of the 'broom' package. The package provides three S3 generics for each model: tidy(), which summarizes a model's statistical findings such as coefficients of a regression; augment(), which adds columns to the original data such as predictions, residuals and cluster assignments; and glance(), which provides a one-row summary of model-level statistics.",
+      "Imports": [
+        "broom",
+        "coda (>= 0.19-4.1)",
+        "dplyr",
+        "forcats",
+        "methods",
+        "nlme",
+        "purrr",
+        "stringr",
+        "tibble",
+        "tidyr",
+        "furrr"
+      ],
+      "Suggests": [
+        "brms",
+        "dotwhisker",
+        "knitr",
+        "testthat",
+        "gamlss",
+        "gamlss.data",
+        "ggplot2",
+        "GLMMadaptive",
+        "glmmADMB",
+        "glmmTMB",
+        "lmerTest",
+        "lme4",
+        "Matrix",
+        "MCMCglmm",
+        "mediation",
+        "mgcv",
+        "mice",
+        "ordinal",
+        "pander",
+        "pbkrtest",
+        "posterior",
+        "rstan",
+        "rstanarm",
+        "rstantools",
+        "R2jags",
+        "TMB",
+        "rmarkdown"
+      ],
+      "URL": "https://github.com/bbolker/broom.mixed",
+      "BugReports": "https://github.com/bbolker/broom.mixed/issues",
+      "License": "GPL-3",
+      "Encoding": "UTF-8",
+      "Additional_repositories": "http://bbolker.github.io/drat",
+      "VignetteBuilder": "knitr",
+      "RoxygenNote": "7.3.3",
+      "NeedsCompilation": "no",
+      "Author": "Ben Bolker [aut, cre] (ORCID: <https://orcid.org/0000-0002-2127-0443>), David Robinson [aut], Dieter Menne [ctb], Jonah Gabry [ctb], Paul Buerkner [ctb], Christopher Hua [ctb], William Petry [ctb] (ORCID: <https://orcid.org/0000-0002-5230-5987>), Joshua Wiley [ctb] (ORCID: <https://orcid.org/0000-0002-0271-6702>), Patrick Kennedy [ctb], Eduard Szöcs [ctb] (ORCID: <https://orcid.org/0000-0001-5376-1194>, sponsor: BASF SE), Indrajeet Patil [ctb], Vincent Arel-Bundock [ctb] (ORCID: <https://orcid.org/0000-0003-2042-7063>), Bill Denney [ctb], Cory Brunson [ctb], Joe Wasserman [ctb] (ORCID: <https://orcid.org/0000-0002-9705-1853>), Alexey Stukalov [ctb], Matthieu Bruneaux [ctb]",
+      "Repository": "CRAN"
+    },
     "bslib": {
       "Package": "bslib",
       "Version": "0.10.0",
@@ -1397,6 +1459,26 @@
       "NeedsCompilation": "yes",
       "Author": "Davis Vaughan [aut, cre], Posit Software, PBC [cph, fnd]",
       "Maintainer": "Davis Vaughan <davis@posit.co>",
+      "Repository": "CRAN"
+    },
+    "coda": {
+      "Package": "coda",
+      "Version": "0.19-4.1",
+      "Source": "Repository",
+      "Date": "2020-09-30",
+      "Title": "Output Analysis and Diagnostics for MCMC",
+      "Authors@R": "c(person(\"Martyn\", \"Plummer\", role=c(\"aut\",\"cre\",\"trl\"), email=\"martyn.plummer@gmail.com\"), person(\"Nicky\", \"Best\", role=\"aut\"), person(\"Kate\", \"Cowles\", role=\"aut\"), person(\"Karen\", \"Vines\", role=\"aut\"), person(\"Deepayan\", \"Sarkar\", role=\"aut\"), person(\"Douglas\", \"Bates\", role=\"aut\"), person(\"Russell\", \"Almond\", role=\"aut\"), person(\"Arni\", \"Magnusson\", role=\"aut\"))",
+      "Depends": [
+        "R (>= 2.14.0)"
+      ],
+      "Imports": [
+        "lattice"
+      ],
+      "Description": "Provides functions for summarizing and plotting the output from Markov Chain Monte Carlo (MCMC) simulations, as well as diagnostic tests of convergence to the equilibrium distribution of the Markov chain.",
+      "License": "GPL (>= 2)",
+      "NeedsCompilation": "no",
+      "Author": "Martyn Plummer [aut, cre, trl], Nicky Best [aut], Kate Cowles [aut], Karen Vines [aut], Deepayan Sarkar [aut], Douglas Bates [aut], Russell Almond [aut], Arni Magnusson [aut]",
+      "Maintainer": "Martyn Plummer <martyn.plummer@gmail.com>",
       "Repository": "CRAN"
     },
     "codetools": {
@@ -2265,6 +2347,44 @@
       "Author": "Jim Hester [aut], Hadley Wickham [aut], Gábor Csárdi [aut], Jeroen Ooms [cre], libuv project contributors [cph] (libuv library), Joyent, Inc. and other Node contributors [cph] (libuv library), Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>)",
       "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
       "Repository": "https://packagemanager.posit.co/cran/latest"
+    },
+    "furrr": {
+      "Package": "furrr",
+      "Version": "0.4.0",
+      "Source": "Repository",
+      "Title": "Apply Mapping Functions in Parallel using Futures",
+      "Authors@R": "c( person(\"Davis\", \"Vaughan\", , \"davis@posit.co\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-4777-038X\")), person(\"Henrik\", \"Bengtsson\", , \"henrikb@braju.com\", role = \"aut\", comment = c(ORCID = \"0000-0002-7579-5165\")), person(\"Matt\", \"Dancho\", , \"mdancho@business-science.io\", role = \"aut\"), person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\")) )",
+      "Description": "Implementations of the family of map() functions from 'purrr' that can be resolved using any 'future'-supported backend, e.g. parallel on the local machine or distributed on a compute cluster.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://github.com/futureverse/furrr, https://furrr.futureverse.org/",
+      "BugReports": "https://github.com/futureverse/furrr/issues",
+      "Depends": [
+        "future (>= 1.70.0)",
+        "R (>= 4.1.0)"
+      ],
+      "Imports": [
+        "globals (>= 0.19.1)",
+        "purrr (>= 1.2.1)",
+        "rlang (>= 1.1.7)",
+        "vctrs (>= 0.7.0)"
+      ],
+      "Suggests": [
+        "carrier",
+        "covr",
+        "dplyr (>= 1.1.4)",
+        "knitr",
+        "parallelly (>= 1.46.1)",
+        "testthat (>= 3.3.2)",
+        "tidyselect"
+      ],
+      "Config/Needs/website": "progressr",
+      "Config/testthat/edition": "3",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.3",
+      "NeedsCompilation": "no",
+      "Author": "Davis Vaughan [aut, cre] (ORCID: <https://orcid.org/0000-0003-4777-038X>), Henrik Bengtsson [aut] (ORCID: <https://orcid.org/0000-0002-7579-5165>), Matt Dancho [aut], Posit Software, PBC [cph, fnd]",
+      "Maintainer": "Davis Vaughan <davis@posit.co>",
+      "Repository": "CRAN"
     },
     "future": {
       "Package": "future",
