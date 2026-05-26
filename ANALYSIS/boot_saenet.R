@@ -25,3 +25,20 @@ boot_saenet <- function(data, pred, out, pf, a, l, wt, adwt, indices) {
   return(output)
 }
 
+
+# function to extract model fit from test data
+# df = dataset passed from dflist |> map(\(df) ...)
+# outcome = string naming the outcome to be predicted
+# coefs = named vector of estimates, minus intercept
+
+test_fit <- function(df, outcome, coefs) {
+  
+  pred = df |> select(all_of(names(coefs))) |> data.matrix() 
+  score = coefs %*% t(pred)
+  
+  newdf = data.frame(score = t(score), out = df[,outcome])
+  
+  fit = lm(out ~ score, data = newdf)
+  
+  return(fit)
+}

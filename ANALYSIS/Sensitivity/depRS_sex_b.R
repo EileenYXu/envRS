@@ -66,7 +66,7 @@ for (i in 1:length(dfs)) {
   base[[i]] = df |> filter(src_subject_id %in% train_ids_sens) |> 
     pull(cbcl_dsm5_depress) |> as.vector()
   
-  scaled[[i]] = df
+  scaled[[i]] = df |> filter(src_subject_id %in% test_ids_sens)
 }
 
 # fit EN models ----
@@ -118,25 +118,40 @@ for (i in 1:length(bcoef)) {
   b_res = rbind(b_res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
 }
 
-# Test fit ----
-fitlist = list()
-mse = c()
-for (i in 1:length(scaled)) {
-  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids_sens)
-  pred = dat |> select(all_of(preds)) |> data.matrix()
-  ests = bcoef[-1] 
-  depRS = ests %*% t(pred)
-  dat$depRS = t(depRS)
-  fit = lm(cbcl_dsm5_depress ~ depRS, data = dat)
-  mse = c(mse,mean(fit$residuals^2))
-  fitlist[[i]] = fit
-}
+b_res = b_res |> mutate(
+  Sig = case_when(
+    Lower <= 0 & 0 <= Upper ~ "N",
+    .default = "Y"
+  )
+)
 
+# Test fit (all predictors) ----
+fitlist = scaled |> 
+  map(\(df) test_fit(df = df, outcome = "cbcl_dsm5_depress",
+                     coefs = bcoef[-1])) |> futurize(seed=T)
+
+mse = fitlist |> map_dbl(\(fit) mean(fit$residuals^2)) |> mean()
 r2 = pool.r.squared(as.mira(fitlist))
-add = data.frame("Predictor"=c("Test R^2", "Test MSE"),
-                 "Estimate"=c(r2[1,1], mean(mse)),
-                 "Lower" = c(r2[1,2], NA),
-                 "Upper" = c(r2[1,3], NA))
+
+## Test fit using significant predictors only ----
+sig = b_res |> filter(Sig=="Y" & Predictor!="(Intercept)") |> 
+  select(Predictor, Estimate)
+sigcoef = as.numeric(sig$Estimate) |> set_names(sig$Predictor)
+
+fitlist = scaled |> 
+  map(\(df) test_fit(df = df, outcome = "cbcl_dsm5_depress",
+                     coefs = sigcoef)) |> futurize(seed=T)
+
+mse_sig = fitlist |> map_dbl(\(fit) mean(fit$residuals^2)) |> mean()
+r2_sig = pool.r.squared(as.mira(fitlist))
+
+add = data.frame("Predictor"=c("Test R^2 all", "Test MSE all",
+                               "Test R^2 sig", "Test MSE sig"),
+                 "Estimate"=c(r2[1,1], mse, r2_sig[1,1], mse_sig),
+                 "Lower" = c(r2[1,2], NA, r2_sig[1,2], NA),
+                 "Upper" = c(r2[1,3], NA, r2_sig[1,3], NA),
+                 "Sig" = rep(NA, 4))
+
 b_res = rbind(b_res, add) |> mutate(
   Estimate = as.numeric(Estimate),
   Lower = as.numeric(Lower),

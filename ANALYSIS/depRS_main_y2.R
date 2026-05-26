@@ -64,7 +64,7 @@ for (i in 1:length(dfs)) {
   base[[i]] = df |> filter(src_subject_id %in% train_ids) |> 
     pull(cbcl_dsm5_depress) |> as.vector()
   
-  scaled[[i]] = df
+  scaled[[i]] = df |> filter(src_subject_id %in% test_ids)
 }
 
 # fit EN models ----
@@ -115,31 +115,44 @@ for (i in 1:length(y2coef)) {
   y2_res = rbind(y2_res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
 }
 
-# Test fit ----
-fitlist = list()
-mse = c()
-for (i in 1:length(scaled)) {
-  dat = scaled[[i]] |> filter(src_subject_id %in% test_ids)
-  pred = dat |> select(all_of(preds)) |> data.matrix()
-  ests = y2coef[-1] 
-  depRS = ests %*% t(pred)
-  dat$depRS = t(depRS)
-  fit = lm(cbcl_dsm5_depress_y2 ~ depRS, data = dat)
-  mse = c(mse,mean(fit$residuals^2))
-  fitlist[[i]] = fit
-}
-
-r2 = pool.r.squared(as.mira(fitlist))
-add = data.frame("Predictor"=c("Test R^2", "Test MSE"),
-                 "Estimate"=c(r2[1,1], mean(mse)),
-                 "Lower" = c(r2[1,2], NA),
-                 "Upper" = c(r2[1,3], NA))
-y2_res = rbind(y2_res, add) |> mutate(
-  Estimate = as.numeric(Estimate),
-  Lower = as.numeric(Lower),
-  Upper = as.numeric(Upper)
+y2_res = y2_res |> mutate(
+  Sig = case_when(
+    Lower <= 0 & 0 <= Upper ~ "N",
+    .default = "Y"
+  )
 )
 
-rm(ci, fit, fitlist, r2, y2, y2_boot, y2fit)
+# Test fit (all predictors) ----
+fitlist = scaled |> 
+  map(\(df) test_fit(df = df, outcome = "cbcl_dsm5_depress_y2",
+                     coefs = y2coef[-1])) |> futurize(seed=T)
 
-write.csv(y2_res, file = "ANALYSIS/OUT/depRS_main_Y2.csv")
+mse = fitlist |> map_dbl(\(fit) mean(fit$residuals^2)) |> mean()
+r2 = pool.r.squared(as.mira(fitlist))
+
+## Test fit using significant predictors only ----
+sig = y2_res |> filter(Sig=="Y" & Predictor!="(Intercept)") |> 
+  select(Predictor, Estimate)
+sigcoef = as.numeric(sig$Estimate) |> set_names(sig$Predictor)
+
+fitlist = scaled |> 
+  map(\(df) test_fit(df = df, outcome = "cbcl_dsm5_depress_y2",
+                     coefs = sigcoef)) |> futurize(seed=T)
+
+mse_sig = fitlist |> map_dbl(\(fit) mean(fit$residuals^2)) |> mean()
+r2_sig = pool.r.squared(as.mira(fitlist))
+
+add = data.frame("Predictor"=c("Test R^2 all", "Test MSE all",
+                               "Test R^2 sig", "Test MSE sig"),
+                 "Estimate"=c(r2[1,1], mse, r2_sig[1,1], mse_sig),
+                 "Lower" = c(r2[1,2], NA, r2_sig[1,2], NA),
+                 "Upper" = c(r2[1,3], NA, r2_sig[1,3], NA),
+                 "Sig" = rep(NA, 4))
+
+y2_res = rbind(y2_res, add) |> mutate(
+ Estimate = as.numeric(Estimate),
+ Lower = as.numeric(Lower),
+ Upper = as.numeric(Upper)
+)
+
+write.csv(y2_res, file = "ANALYSIS/OUT/depRS_main_Y2.csv", row.names = FALSE)
