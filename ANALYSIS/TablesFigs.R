@@ -10,14 +10,12 @@ library(tidyverse)
 library(pROC)
 library(patchwork)
 library(paletteer)
-pal = paletteer::paletteer_d("colorblindr::OkabeIto")
-#scale_colour_paletteer_d("fishualize::Balistapus_undulatus")
 
 # Figure 2 ----
 
 ## Panel A ----
 coefs = read.csv("ANALYSIS/OUT/depRS_main_Y2.csv")
-coefs = coefs[-1,-1] |> filter(Sig=="Y")
+coefs = coefs[-1,] |> filter(Sig=="Y")
 
 top10 = coefs |> arrange(desc(abs(Estimate))) |> slice_head(n = 10)
 
