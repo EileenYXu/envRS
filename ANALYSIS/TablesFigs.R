@@ -19,9 +19,9 @@ coefs = coefs[-1,] |> filter(Sig=="Y")
 
 top10 = coefs |> arrange(desc(abs(Estimate))) |> slice_head(n = 10)
 
-plotlabs = c("Emotional abuse", "Sexual abuse", "Witnessed DV", "Dieting",
-             "Tried tobacco", "Needed food", "Parental depression",
-             "Serious accident", "Lost a loved one", "Hours of sleep")
+plotlabs = c("Parental depression", "Dieting", "Witnessed DV", "Sleep duration",
+             "Parental monitoring", "Age", "Area deprivation index", 
+             "Family conflict", "Parental acceptance", "BMI")
 
 top10$labs = plotlabs
 
@@ -30,23 +30,26 @@ plotA = ggplot(top10) +
                       y = fct_rev(labs), size = abs(Estimate), 
                       colour = Estimate)) +
   geom_vline(xintercept = 0, alpha = 0.3, linetype = "dashed") + 
-  scale_size_binned(range = c(0.3, 1), guide = NULL, aesthetics = "size") +
-  scale_colour_viridis_b(option = "turbo", alpha = 1, direction = 1,
-                         begin = 0.3, end = 0.9, 
-                         values = rescale_mid(top10$Estimate,mid = 0),
+  scale_size_binned(range = c(0.3, 0.9), guide = NULL, aesthetics = "size") +
+  scale_colour_viridis_c(option = "turbo", alpha = 1, direction = 1,
+                         begin = 0.5, end = 1, 
                          guide = NULL) +
   scale_y_discrete(name = NULL) +
-  scale_x_continuous(name = "Std. \U03b2 coefficient", n.breaks = 6) +
+  scale_x_continuous(name = "Std. \U03b2 coefficient", 
+                     limits = c(-0.1, 0.35)) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 10), legend.title = element_text(size=9))
 
 plotA
 
 ## Panel B (parent) ----
+pal = paletteer_d("colorblindr::OkabeIto")
+pal[c(1,2,3,7)]
+
 rocs.p = readRDS("DATA/main_rocs_p.rds")
 
 parent = ggroc(rocs.p) +
-  scale_colour_viridis_d(option = "turbo", alpha = 1, begin = 0.2, end = 0.8) +
+  scale_colour_manual(values = pal[c(1,2,3,7)]) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7,
                linetype = "dashed") + theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
@@ -57,7 +60,7 @@ parent
 rocs.y = readRDS("DATA/main_rocs_y.rds")
 
 youth = ggroc(rocs.y) +
-  scale_colour_viridis_d(option = "turbo", alpha = 1, begin = 0.2, end = 0.8) +
+  scale_colour_manual(values = pal[c(1,2,3,7)]) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7,
                linetype = "dashed") + theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
@@ -80,7 +83,7 @@ rm(list = ls())
 
 # Tables -------------
 
-source("ANALYSIS/summarystats.R")
+source("ANALYSIS/funs.R")
 
 # full sample (including twins)
 abcd = readRDS("DATA/predictors_allIDs.rds")

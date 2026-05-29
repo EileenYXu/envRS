@@ -111,10 +111,11 @@ mdd.p = mdd.p |> select(src_subject_id, mdd_lifetime, mdd_incident) |>
   setNames(c("id", "mdd.p", "incident.p"))
 
 mdd.all = merge(mdd.p, mdd.y, by = "id", all = TRUE)
-depRS.PRS = merge(depRS.PRS, mdd.all, by.x = "src_subject_id", by.y = "id", all.x = TRUE)
+depRS.PRS = merge(depRS.PRS, mdd.all, by.x = "src_subject_id", by.y = "id", 
+                  all.x = TRUE)
 
-sum(!is.na(depRS.PRS$mdd.y)) #6736 with self-reported lifetime MDD data
-sum(!is.na(depRS.PRS$mdd.p)) #6660 with parent-reported lifetime MDD data
+sum(!is.na(depRS.PRS$mdd.y)) #7271 with self-reported lifetime MDD data
+sum(!is.na(depRS.PRS$mdd.p)) #7194 with parent-reported lifetime MDD data
 
 summary(depRS.PRS[,17:20])
 any(duplicated(depRS.PRS))

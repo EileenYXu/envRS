@@ -20,7 +20,7 @@ dat = readRDS("DATA/depRS_PRS.rds") |> mutate(depRS = scale(depRS),
 
 ctrl = glmerControl(optimizer = "bobyqa")
 
-# (a) self-reported lifetime MDD (N = 6551) ----
+# (a) self-reported lifetime MDD (N = 7063) ----
 dat.y = dat |> filter(!is.na(mdd.y) & incident.y!="exclude") |> droplevels()
 
 m1depRS.y = glmer(mdd.y ~ depRS + (1 | site_id_l), dat.y, 
@@ -89,7 +89,7 @@ openxlsx::write.xlsx(res, "ANALYSIS/OUT/depRS_PRS_y.xlsx")
 
 rm(list = setdiff(ls(), c("dat", "ctrl")))
 
-# (b) parent-reported lifetime MDD (N=6489) ----
+# (b) parent-reported lifetime MDD (N=7009) ----
 dat.p = dat |> filter(!is.na(mdd.p) & incident.p!="exclude") |> droplevels()
 
 m1depRS.p = glmer(mdd.p ~ depRS + (1 | site_id_l), dat.p, 
