@@ -66,16 +66,14 @@ dat = readRDS("DATA/predictors_unrelatedIDs.rds") |>
   select(all_of(preds)) |> droplevels() 
 
 complete = dat[complete.cases(dat[,coefs$Predictor]),] |> filter(gender != "GNC")
-nrow(complete) #8092 complete cases
+nrow(complete) #8818 complete cases
 rm(dat)
 
 # binary predictors to be dummy coded as 0/1 
-binpreds = c("tobacco_puff", "weightcontrol_ksads", "death_loved_one", 
-             "witness_dv", "s_abuse", "emot_abuse", "serious_accident", 
-             "needed_food")
+binpreds = c("weightcontrol_ksads", "witness_dv")
 
 # numeric predictors to be centred and scaled
-numpreds = c("sleep_hrs", "bmi", "income", "comm_safety", 
+numpreds = c("site_id_l", "sleep_hrs", "bmi", "area_depriv", "comm_safety",
              "days_acti", "fam_conflict", "p_monitoring", 
              "p_acceptance", "p_depression", "interview_age")
 
@@ -99,7 +97,7 @@ sens.prs = df.prs |> filter(ANC!="EUR_div") |> select(IID, PRS.z) |> setNames(c(
 
 depRS.PRS = merge(complete, div.prs, by.x = "src_subject_id", by.y = "IID")
 depRS.PRS = merge(depRS.PRS, sens.prs, by.x = "src_subject_id", by.y = "IID")
-nrow(depRS.PRS) #7283 with depRS + PRS
+nrow(depRS.PRS) #7902 with depRS + PRS
 
 rm(df.prs, div.prs, sens.prs, complete)
 

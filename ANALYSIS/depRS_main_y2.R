@@ -12,7 +12,7 @@ library(mice)
 library(boot)
 library(glmnet)
 
-plan(sequential)
+plan(multisession)
 set.seed(211206)
 
 load("DATA/baseline_imputed.RData")
@@ -55,9 +55,9 @@ train_x = train |> select(all_of(xvars)) |> data.matrix()
 train_y = train |> select(cbcl_dsm5_depress_y2) |> data.matrix()
 trainwts = train |> pull(misswt)
 
-## stack testing datasets ----
+## test data ----
 testdfs = dfs |> map(\(df) filter(df, src_subject_id %in% test_ids)) |> 
-  futurize()
+  futurize(seed=TRUE)
 
 # clean up
 rm(dfs, traindfs, train, misswts, binpreds, numpreds)
@@ -74,7 +74,6 @@ pf = c(0, rep(1, 23))
 # cross-validate over alphas
 alphas = seq(0, 1, by = 0.1)
 
-# cross-validate alpha
 depfits = alphas |> 
   map(\(a) cv.glmnet(x = train_x[,-1], y = train_y, foldid = foldid, 
                      type.measure = "mse", alpha = a, 
@@ -91,12 +90,14 @@ train_mse = depfits |> imap(\(fit, i)
              "lambda.1se" = fit$cvm[fit$lambda == fit$lambda.1se])) |> 
   reduce(rbind)
 
-# model with lowest MSE: alpha = 0, MSE = 0.874
+# model with lowest MSE
 train_mse[which.min(train_mse$lambda.min),] 
-# most penalised model with lowest MSE: alpha = 0.1, MSE = 0.90
+a = train_mse[which.min(train_mse$lambda.min),]$alpha
+
+# most penalised model with lowest MSE
 train_mse[which.min(train_mse$lambda.1se),]
 
-best = depfits$`0`
+best = depfits[[a]]
 rm(depfits)
 
 # Bootstrap coefficients ----
@@ -104,7 +105,7 @@ source("ANALYSIS/funs.R")
 
 # run boot() on unique(x[,1]) for consistent resampling across datasets
 boot = boot(data = unique(train_x[,1]), statistic = miboot_glmnet, R = 2000,
-     xmat = train_x, ymat = train_y, pf = pf, alpha = 0, wt = trainwts,
+     xmat = train_x, ymat = train_y, pf = pf, alpha = as.numeric(a), wt = trainwts,
      intercept = FALSE) |> 
   futurize(seed=TRUE)
 
@@ -162,5 +163,7 @@ res = rbind(res, add) |> mutate(
  Lower = as.numeric(Lower),
  Upper = as.numeric(Upper)
 )
+
+res
 
 write.csv(res, file = "ANALYSIS/OUT/depRS_main_Y2.csv", row.names = FALSE)
