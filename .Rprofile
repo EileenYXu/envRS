@@ -1,2 +1,2 @@
 source("renv/activate.R")
-.libPaths("/gpfs/igmmfs01/eddie/GenScotDepression/users/eileen/R/x86_64-pc-linux-gnu-library")
+.libPaths("C:/Program Files/R/R-4.5.3/library")

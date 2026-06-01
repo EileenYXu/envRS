@@ -1,8 +1,6 @@
 {
   "bioconductor.version": null,
-  "external.libraries": [
-    "/gpfs/igmmfs01/eddie/GenScotDepression/users/eileen/R/x86_64-pc-linux-gnu-library"
-  ],
+  "external.libraries": [],
   "ignored.packages": [],
   "lockfile.sanitize": true,
   "package.dependency.fields": [
