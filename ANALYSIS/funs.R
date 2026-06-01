@@ -18,7 +18,7 @@ miboot_glmnet <- function(data, indices, xmat, ymat, alpha, pf, wt = NULL,
   rows = xmat[,1] %in% indices
   
   if(is.null(wt)){
-    wt = rep(1, nrow(x))
+    wt = rep(1, nrow(xmat))
   }
   
   w = wt[rows]
@@ -28,6 +28,29 @@ miboot_glmnet <- function(data, indices, xmat, ymat, alpha, pf, wt = NULL,
   
   fit = glmnet::glmnet(x = xdat, y = yvar, alpha = alpha, penalty.factor = pf,
                       weights = w, intercept = intercept)
+  s = min(fit$lambda)
+  
+  output = coef(fit, s = s) |> as.matrix()
+  
+  return(output)
+}
+
+
+# function to bootstrap glmnet on non multiply-imputed data
+# ycol = outcome column no.
+boot_glmnet <- function(data, indices, ycol, alpha, pf, wt = NULL, 
+                        intercept = TRUE){
+  
+  xdat = data[indices,-ycol]
+  yvar = data[indices,ycol]
+  
+  if(is.null(wt)){
+    wt = rep(1, length(indices))
+  } else {wt = wt[indices]}
+  
+  fit = glmnet::glmnet(x = xdat, y = yvar, alpha = alpha, 
+                       penalty.factor = pf, wt = wt, intercept = intercept)
+  
   s = min(fit$lambda)
   
   output = coef(fit, s = s) |> as.matrix()

@@ -1,21 +1,21 @@
-###################################################################
-## Sensitivity analysis with Y2 predictors predicting depression ##
-###################################################################
+#---------------------------------------------------------------#
+# Sensitivity analysis with Y2 predictors predicting depression #
+#---------------------------------------------------------------#
 
-# using glmnet, not imputing
+# complete case analysis
 
 renv::load()
-here::i_am("ANALYSIS/Sensitivity/y2preds_depRS.R")
-set.seed(211206)
+here::i_am("ANALYSIS/Sensitivity/y2preds_sensitivity.R")
 
 ## Packages ----
 library(futurize)
-plan(multisession)
-
 library(tidyverse)
 library(glmnet)
 library(caret)
 library(boot)
+
+plan(multisession)
+set.seed(211206)
 
 dat = readRDS("DATA/dat_y2.rds") |> na.omit() |> filter(gender!="GNC") |> droplevels()
 
@@ -59,7 +59,7 @@ index = createDataPartition(dat$cbcl_dsm5_depress, p = 0.2, list = F, times = 1)
 train = dat[-index,] |> 
   select(all_of(preds)) |> data.matrix()
 test = dat[index,] |> 
-  select(all_of(preds)) |> data.matrix()
+  select(all_of(preds))
 
 ## assign each observation to a fold so that I can cross-validate alpha
 foldid = sample(1:10, size = nrow(train), replace = TRUE)
@@ -73,103 +73,159 @@ pf = c(0, rep(1, 32))
 depfits = alphas |> 
   map(\(i) cv.glmnet(x = train[,-c(1,2)], y = train[,1], foldid = foldid, 
                              type.measure = "deviance", alpha = i, 
-                             penalty.factor = pf)) |> futurize(seed=TRUE)
+                             penalty.factor = pf, intercept = FALSE)) |> futurize(seed=TRUE)
 
-## use for loop to get fit statistics for each alpha value in training data
-trainfits = depfits |> 
-  map(\(i) assess.glmnet(i, newx = train[,-c(1,2)], newy = train[,1], 
-                         s = "lambda.min")) |> futurize(seed=TRUE)
+## get fit statistics for each alpha value in training data
+names(depfits) = alphas
 
-train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
-rownames(data.frame(train_mse))[which.min(train_mse)]
-# min alpha = 0
-# train MSE = 0.697499  
-train_mse["0"]
+train_mse = depfits |> 
+  imap(\(fit, i) 
+       data.frame("alpha" = i,
+                  "lambda.min" = fit$cvm[fit$lambda == fit$lambda.min],
+                  "lambda.1se" = fit$cvm[fit$lambda == fit$lambda.1se])) |> 
+  reduce(rbind)
 
-# coefficients
-coefs = coef(depfits[["0"]], s = "lambda.min") |> as.matrix()
+# model with lowest MSE
+train_mse[which.min(train_mse$lambda.min),] 
+a = train_mse[which.min(train_mse$lambda.min),]$alpha
+# min alpha = 1
 
-## test data MSE = 0.7013873   
-assess.glmnet(depfits$`0`, newx = test[,-c(1,2)], newy = test[,1], s = "lambda.min")
+best = depfits[[a]]
+rm(depfits)
 
-## test data R^2 = 0.2804
-testpred = predict(depfits$`0`, s = "lambda.min", newx = test[,-c(1,2)])
-testlm = lm(test[,1] ~ testpred)
-summary(testlm)
+## Bootstrap coefficients for 95% CI ----
+source("ANALYSIS/funs.R")
 
-### bootstrap 95% CI ----
-alpha = 0
-lambda = depfits$`0`$lambda.min
-
-boot_glmnet <- function(x, indices, alpha, lambda, pf, ycol){
-  
-  xdat = x[indices,-c(1,2)]
-  yvar = x[indices,ycol]
-  
-  fit = glmnet::glmnet(x = xdat, y = yvar, lambda = lambda, alpha = alpha, 
-               penalty.factor = pf)
-  
-  output = coef(fit, s = "lambda.min") |> as.matrix()
-
-  return(output)
-}
-
-boot = boot(data = train, statistic = boot_glmnet, R = 2000,
-            alpha = alpha, lambda = lambda, pf = pf, stype = "i", ycol = 1) |> 
+boot = boot(data = train[,-2], statistic = boot_glmnet, R = 2000,
+            alpha = a, pf = pf, stype = "i", ycol = 1, intercept = F) |> 
   futurize(seed = TRUE)
 
-res = 1:length(coefs) |> 
-  map(\(i) boot.ci(boot.out = boot, conf = 0.95, type = "basic", 
-                   index = i)$basic[4:5]) |> setNames(rownames(coefs)) |> 
-  as.data.frame() |> t()
+## Get CIs ----
+boot$t0 = coef(best, s = "lambda.min")
+res = data.frame()
 
-output = cbind(coefs, res) |> as.data.frame() |> setNames(c("Est", "Lower", "Upper"))
+for (i in 1:length(boot$t0)) {
+  ci = boot.ci(boot.out = boot, conf = 0.95, type = "basic", index = i)
+  pred = rownames(boot$t0)[i]
+  est = ci$t0
+  lower = ci$basic[4]
+  upper = ci$basic[5]
+  res = rbind(res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
+}
 
-write.csv(output, file = "ANALYSIS/OUT/y2_depRS_sens.csv")
+res = res |> mutate(
+  Sig = case_when(
+    Lower <= 0 & 0 <= Upper ~ "N",
+    .default = "Y"
+  )
+)
+
+# Test fit (all predictors) ----
+coefs = as.numeric(res$Estimate) |> setNames(res$Predictor)
+fit = test_fit(df = test, outcome = "cbcl_dsm5_depress", coefs = coefs[-1])
+mse = mean(fit$residuals^2)
+r2 = summary(fit)$r.squared
+
+## Test fit using significant predictors only ----
+sig = res |> filter(Sig=="Y" & Predictor!="(Intercept)")
+sigcoef = as.numeric(sig$Estimate) |> set_names(sig$Predictor)
+
+fit = test_fit(df = test, outcome = "cbcl_dsm5_depress", coefs = sigcoef)
+mse_sig = mean(fit$residuals^2)
+r2_sig = summary(fit)$r.squared
+
+add = data.frame("Predictor"=c("Test R^2 all", "Test MSE all",
+                               "Test R^2 sig", "Test MSE sig"),
+                 "Estimate"=c(r2, mse, r2_sig, mse_sig),
+                 "Lower"=rep(NA, 4), "Upper"=rep(NA, 4), "Sig"=rep(NA, 4))
+
+res = rbind(res, add) |> mutate(
+  Estimate = as.numeric(Estimate),
+  Lower = as.numeric(Lower),
+  Upper = as.numeric(Upper)
+)
+
+res
+
+write.csv(res, file = "ANALYSIS/OUT/y2_depRS_sens.csv")
 
 ## EN internalising ----
-
 ## cross-validate alphas
 intfits = alphas |> 
   map(\(i) cv.glmnet(x = train[,-c(1,2)], y = train[,2], foldid = foldid, 
                      type.measure = "deviance", alpha = i, 
-                     penalty.factor = pf)) |> futurize(seed=TRUE)
+                     penalty.factor = pf, intercept = FALSE)) |> futurize(seed=TRUE)
 
 ## get fit statistics for each alpha value in training data
-trainfits = intfits |> 
-  map(\(i) assess.glmnet(i, newx = train[,-c(1,2)], newy = train[,2], 
-                         s = "lambda.min")) |> futurize(seed=TRUE)
+names(intfits) = alphas
 
-train_mse = sapply(trainfits, function(x) x$mse[["lambda.min"]])
-rownames(data.frame(train_mse))[which.min(train_mse)]
-# min alpha = 0
-# train MSE = 0.7069719  
-train_mse["0"]
+train_mse = intfits |> 
+  imap(\(fit, i) 
+       data.frame("alpha" = i,
+                  "lambda.min" = fit$cvm[fit$lambda == fit$lambda.min],
+                  "lambda.1se" = fit$cvm[fit$lambda == fit$lambda.1se])) |> 
+  reduce(rbind)
 
-# coefficients
-coefs = coef(intfits[["0"]], s = "lambda.min") |> as.matrix()
+# model with lowest MSE
+train_mse[which.min(train_mse$lambda.min),] 
+a = train_mse[which.min(train_mse$lambda.min),]$alpha
+# min alpha = 1
 
-## test data MSE = 0.7051588
-assess.glmnet(intfits$`0`, newx = test[,-c(1,2)], newy = test[,2], s = "lambda.min")
+best = intfits[[a]]
+rm(intfits)
 
-## test data R^2 = 0.2689
-testpred = predict(intfits$`0`, s = "lambda.min", newx = test[,-c(1,2)])
-testlm = lm(test[,2] ~ testpred)
-summary(testlm)
+## Bootstrap coefficients for 95% CI ----
+source("ANALYSIS/funs.R")
 
-### bootstrap 95% CI for coefficients ----
-alpha = 0
-lambda = intfits$`0`$lambda.min
-
-boot = boot(data = train, statistic = boot_glmnet, R = 2000,
-            alpha = alpha, lambda = lambda, pf = pf, stype = "i", ycol = 2) |> 
+boot = boot(data = train[,-1], statistic = boot_glmnet, R = 2000,
+            alpha = a, pf = pf, stype = "i", ycol = 1, intercept = F) |> 
   futurize(seed = TRUE)
 
-res = 1:length(coefs) |> 
-  map(\(i) boot.ci(boot.out = boot, conf = 0.95, type = "basic", 
-                   index = i)$basic[4:5]) |> setNames(rownames(coefs)) |> 
-  as.data.frame() |> t()
+## Get CIs ----
+boot$t0 = coef(best, s = "lambda.min")
+res = data.frame()
 
-output = cbind(coefs, res) |> as.data.frame() |> setNames(c("Est", "Lower", "Upper"))
+for (i in 1:length(boot$t0)) {
+  ci = boot.ci(boot.out = boot, conf = 0.95, type = "basic", index = i)
+  pred = rownames(boot$t0)[i]
+  est = ci$t0
+  lower = ci$basic[4]
+  upper = ci$basic[5]
+  res = rbind(res, c(pred, est, lower, upper)) |> setNames(c("Predictor", "Estimate", "Lower", "Upper"))
+}
 
-write.csv(output, file = "ANALYSIS/OUT/y2_intRS_sens.csv")
+res = res |> mutate(
+  Sig = case_when(
+    Lower <= 0 & 0 <= Upper ~ "N",
+    .default = "Y"
+  )
+)
+
+# Test fit (all predictors) ----
+coefs = as.numeric(res$Estimate) |> setNames(res$Predictor)
+fit = test_fit(df = test, outcome = "cbcl_internalising", coefs = coefs[-1])
+mse = mean(fit$residuals^2)
+r2 = summary(fit)$r.squared
+
+## Test fit using significant predictors only ----
+sig = res |> filter(Sig=="Y" & Predictor!="(Intercept)")
+sigcoef = as.numeric(sig$Estimate) |> set_names(sig$Predictor)
+
+fit = test_fit(df = test, outcome = "cbcl_internalising", coefs = sigcoef)
+mse_sig = mean(fit$residuals^2)
+r2_sig = summary(fit)$r.squared
+
+add = data.frame("Predictor"=c("Test R^2 all", "Test MSE all",
+                               "Test R^2 sig", "Test MSE sig"),
+                 "Estimate"=c(r2, mse, r2_sig, mse_sig),
+                 "Lower"=rep(NA, 4), "Upper"=rep(NA, 4), "Sig"=rep(NA, 4))
+
+res = rbind(res, add) |> mutate(
+  Estimate = as.numeric(Estimate),
+  Lower = as.numeric(Lower),
+  Upper = as.numeric(Upper)
+)
+
+res
+
+write.csv(res, file = "ANALYSIS/OUT/y2_intRS_sens.csv")

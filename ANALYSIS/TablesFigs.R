@@ -18,9 +18,10 @@ coefs = read.csv("ANALYSIS/OUT/depRS_main_Y2.csv")
 coefs = coefs[-1,] |> filter(Sig=="Y")
 
 top10 = coefs |> arrange(desc(abs(Estimate))) |> slice_head(n = 10)
+top10
 
 plotlabs = c("Parental depression", "Dieting", "Witnessed DV", "Sleep duration",
-             "Parental monitoring", "Age", "Area deprivation index", 
+             "Parental monitoring", "Age (months)", "Area deprivation index", 
              "Family conflict", "Parental acceptance", "BMI")
 
 top10$labs = plotlabs
@@ -31,9 +32,8 @@ plotA = ggplot(top10) +
                       colour = Estimate)) +
   geom_vline(xintercept = 0, alpha = 0.3, linetype = "dashed") + 
   scale_size_binned(range = c(0.3, 0.9), guide = NULL, aesthetics = "size") +
-  scale_colour_viridis_c(option = "turbo", alpha = 1, direction = 1,
-                         begin = 0.5, end = 1, 
-                         guide = NULL) +
+  scale_colour_gradientn(colours = viridisLite::turbo(4,begin = 0.45), 
+                         guide = NULL)+
   scale_y_discrete(name = NULL) +
   scale_x_continuous(name = "Std. \U03b2 coefficient", 
                      limits = c(-0.1, 0.35)) +
@@ -43,13 +43,10 @@ plotA = ggplot(top10) +
 plotA
 
 ## Panel B (parent) ----
-pal = paletteer_d("colorblindr::OkabeIto")
-pal[c(1,2,3,7)]
-
 rocs.p = readRDS("DATA/main_rocs_p.rds")
 
 parent = ggroc(rocs.p) +
-  scale_colour_manual(values = pal[c(1,2,3,7)]) +
+  scale_colour_paletteer_d(`"colorblindr::OkabeIto"`) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7,
                linetype = "dashed") + theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
@@ -60,26 +57,26 @@ parent
 rocs.y = readRDS("DATA/main_rocs_y.rds")
 
 youth = ggroc(rocs.y) +
-  scale_colour_manual(values = pal[c(1,2,3,7)]) +
+  scale_colour_paletteer_d(`"colorblindr::OkabeIto"`) +
   geom_segment(aes(x=1, y=0, xend=0, yend=1), colour = "black", alpha = 0.7,
                linetype = "dashed") + theme_bw() + 
   labs(x = "Specificity", y = "Sensitivity", color = "Model")
 
-youth  
+youth
   
 ## Assemble ----
-c.plot = plotA + ggtitle("A")
+coef.plot = plotA + ggtitle("A")
 p.plot = parent + ggtitle("B")
 y.plot = youth + ggtitle("C")
 
-fig2 = c.plot + (p.plot / y.plot) + 
+fig2 = coef.plot + (p.plot / y.plot) + 
   plot_layout(guides = "collect", widths = c(1.3,1))
 fig2
 
-ggsave(plot = fig2, filename = "PLOTS/fig2_recoloured2.jpg", 
+ggsave(plot = fig2, filename = "PLOTS/fig2_OkabeIto.jpg", 
        height = 6, width = 9, units = "in", dpi = "retina")
 
-rm(list = ls())
+#rm(list = ls())
 
 # Tables -------------
 
