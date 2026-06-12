@@ -141,9 +141,9 @@ demog = demog |> mutate(
   race_ethnicity = factor(race_ethnicity, 
                           labels = c("White", "Black","Hispanic", 
                                      "Asian", "Other")),
-  birthsex = factor(demo_sex_v2,
+  birthsex = factor(demo_sex_v2, levels = c(1, 2, 3),
                     labels =c("M", "F", "Intersex")),
-  gender_id = factor(gender_id,
+  gender_id = factor(gender_id, levels = c(1, 2, 3, 4, 5, 6),
                      labels = c("M", "F", "Mtrans",
                                 "Ftrans", "GNC", "Diff"))
 )
